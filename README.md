@@ -66,7 +66,7 @@ python manage.py migrate
 Start the development server
 python manage.py runserver
 Open the portal in your browser
-http://127.0.0.1:8000
+http://127.0.0.1:8000/
 
 ## Future Improvements
 
