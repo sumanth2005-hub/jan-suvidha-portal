@@ -1,0 +1,1044 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Find Your Schemes — Jan Suvidha Portal{% endblock %}
+{% block body_class %}questionnaire-page{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="progress-bar-container">
+        <div class="progress-text"><span id="progressLabel"></span></div>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width:0%"></div>
+        </div>
+    </div>
+
+    <div class="chat-header">
+        <div class="chat-avatar">🤖</div>
+        <div class="chat-header-info">
+            <h2 id="chatTitle">Jan Suvidha Assistant</h2>
+            <p id="chatSubtitle">Helping you find the right schemes</p>
+        </div>
+        <button class="voice-btn" id="voiceToggle" title="Toggle voice read-out">
+            <i class="fas fa-volume-up"></i>
+        </button>
+    </div>
+    <!-- Language selector strip -->
+    <div class="chat-lang-bar">
+        <span class="chat-lang-label"><i class="fas fa-globe"></i></span>
+        <button class="chat-lang-btn" data-lang="en" onclick="switchLang('en')">English</button>
+        <button class="chat-lang-btn" data-lang="hi" onclick="switchLang('hi')">हिन्दी</button>
+        <button class="chat-lang-btn" data-lang="kn" onclick="switchLang('kn')">ಕನ್ನಡ</button>
+        <button class="chat-lang-btn" data-lang="te" onclick="switchLang('te')">తెలుగు</button>
+        <button class="chat-lang-btn" data-lang="ta" onclick="switchLang('ta')">தமிழ்</button>
+    </div>
+
+    <div class="chat-messages" id="chatMessages"></div>
+
+    <div class="chat-input-area" id="inputArea">
+        <div id="optionsContainer"></div>
+        <!-- Always-visible text input row -->
+        <div class="input-row" id="typingRow">
+            <input type="text" class="chat-input" id="textInput" placeholder="Type your answer here..."
+                style="display:block;">
+            <!-- Mic button for voice input -->
+            <button class="btn btn-mic" id="micBtn" onclick="startListening()" title="Speak your answer">
+                <i class="fas fa-microphone" id="micIcon"></i>
+            </button>
+            <button class="btn btn-primary btn-icon" id="sendBtn" onclick="sendTypedAnswer()">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+        <!-- Voice Q&A hint -->
+        <div class="voice-qa-hint" id="voiceHint">
+            <i class="fas fa-keyboard"></i> Type your answer above, click an option, or <i
+                class="fas fa-microphone"></i> tap mic to speak
+        </div>
+    </div>
+</div>
+
+<!-- Floating Voice Q&A Button -->
+<div class="voice-qa-fab" id="voiceQAFab" onclick="toggleVoiceQA()">
+    <div class="fab-pulse-qa"></div>
+    <i class="fas fa-headset"></i>
+    <span class="qa-label">Ask Me</span>
+</div>
+
+<!-- Voice Q&A Panel -->
+<div class="qa-panel hidden" id="qaPanel">
+    <div class="qa-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <div class="qa-avatar">🎧</div>
+            <div>
+                <h3 id="qaPanelTitle">Voice Q&A Assistant</h3>
+                <p id="qaStatus">Ask me anything about schemes!</p>
+            </div>
+        </div>
+        <button class="voice-close" onclick="closeQAPanel()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="qa-messages" id="qaMessages"></div>
+    <div class="qa-input">
+        <button class="qa-mic-btn" id="qaMicBtn" onclick="startQAListening()">
+            <div class="mic-ring" id="qaMicRing"></div>
+            <i class="fas fa-microphone" id="qaMicIcon"></i>
+        </button>
+        <p id="qaMicLabel">Tap to speak</p>
+    </div>
+    <div class="qa-suggestions" id="qaSuggestions"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/voice.js' %}"></script>
+<script>
+    const LANG = '{{ lang }}';
+    const USER_ID = '{{ user_id }}';
+    const TOTAL_QUESTIONS = 12;
+    let currentResponses = {};
+    let questionCount = 0;
+    let voiceEnabled = true;
+
+    // Highlight active language button
+    document.querySelectorAll('.chat-lang-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.lang === LANG);
+    });
+
+    // Switch language: update session and reload
+    function switchLang(newLang) {
+        if (newLang === LANG) return;
+        localStorage.setItem('janSuvidhaLang', newLang);
+        fetch('/api/switch-language/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+            body: JSON.stringify({ language: newLang })
+        }).then(() => {
+            window.location.reload();
+        }).catch(() => {
+            window.location.reload();
+        });
+    }
+
+    const chatMessages = document.getElementById('chatMessages');
+    const optionsContainer = document.getElementById('optionsContainer');
+    const textInput = document.getElementById('textInput');
+    const numberInput = document.getElementById('numberInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    // ──── Voice Q&A Knowledge Base (10-15 questions per language) ────
+    const voiceQA = {
+        en: [
+            { q: ["am i eligible", "eligible for scheme", "can i get benefit", "what scheme for me"], a: "Based on your answers, I'll check your eligibility for 15+ welfare schemes covering farming, housing, education, health, and more. Complete all questions first!" },
+            { q: ["how many schemes", "total schemes", "list schemes"], a: "We have 15 government welfare schemes in our database — covering farmers, women, elderly, disabled, students, and BPL families." },
+            { q: ["what documents", "documents needed", "papers required", "kya document chahiye"], a: "Common documents include Aadhaar Card, Income Certificate, BPL Card, Land Records, Caste Certificate, and Bank Passbook. Each scheme has specific requirements." },
+            { q: ["is this free", "cost", "fees", "charges"], a: "Yes! Jan Suvidha Portal is completely free. We never charge any fees. This is a government welfare discovery platform." },
+            { q: ["is my data safe", "privacy", "security", "data protection"], a: "Your data is completely safe. This is an academic prototype — no real government data is used. Your information stays on this device only." },
+            { q: ["farmer scheme", "kisan", "agriculture", "farming benefit"], a: "We have schemes like Kisan Samman Yojana (₹6000/year), Crop Insurance Scheme, and Rural Employment Guarantee. Answer the questions to check eligibility!" },
+            { q: ["housing scheme", "ghar", "awas", "home"], a: "Awas Gramin Yojana provides ₹1,20,000 for housing. You need to be BPL with income below ₹3,00,000 to qualify." },
+            { q: ["education scheme", "scholarship", "padhai", "student"], a: "We have SC/ST Scholarship (₹50,000/year) and Digital Literacy Programme for students and youth." },
+            { q: ["pension scheme", "old age", "elderly", "senior citizen"], a: "Senior Citizen Pension provides ₹3,000/month for citizens aged 60+ with income below ₹2,00,000." },
+            { q: ["women scheme", "mahila", "lady", "pregnancy", "maternity"], a: "Mahila Shakti Yojana (₹5,000), Maternity Benefit (₹6,000), and self-employment schemes are available for women." },
+            { q: ["disability scheme", "viklang", "handicap", "divyang"], a: "Disability Pension provides ₹2,500/month for persons with 40%+ disability and income below ₹2,00,000." },
+            { q: ["how to apply", "apply kaise", "application process"], a: "After answering 12 questions, you'll see eligible schemes with benefit probability. Upload your documents to increase your chances, then click Apply!" },
+            { q: ["benefit probability", "chance", "kitna milega", "how much"], a: "Benefit probability is calculated as: 60% from eligibility match + 40% from document completeness. Upload all required documents to maximize it!" },
+            { q: ["what is bpl", "below poverty line"], a: "BPL means Below Poverty Line — families with annual income below ₹1,00,000. If you have a BPL card, you qualify for many additional schemes." },
+            { q: ["language change", "bhasha badlo", "other language"], a: "You can use this portal in English, Hindi, Kannada, Telugu, and Tamil. Go back to the home page to change your language." },
+        ],
+        hi: [
+            { q: ["क्या मैं पात्र हूँ", "मुझे योजना मिलेगी", "eligible", "योग्य"], a: "आपके उत्तरों के आधार पर मैं 15+ कल्याण योजनाओं में आपकी पात्रता जाँचूँगा। पहले सभी प्रश्नों के उत्तर दें!" },
+            { q: ["कितनी योजनाएं", "योजनाओं की सूची", "total scheme"], a: "हमारे पास 15 सरकारी योजनाएं हैं — किसान, महिला, वृद्ध, विकलांग, छात्र और BPL परिवारों के लिए।" },
+            { q: ["कौन से दस्तावेज", "document", "कागजात"], a: "आधार कार्ड, आय प्रमाणपत्र, BPL कार्ड, भूमि रिकॉर्ड, जाति प्रमाणपत्र और बैंक पासबुक — हर योजना के अलग दस्तावेज हैं।" },
+            { q: ["मुफ्त है", "पैसे लगेंगे", "फीस"], a: "हाँ! जन सुविधा पोर्टल पूरी तरह मुफ्त है। हम कोई शुल्क नहीं लेते।" },
+            { q: ["किसान योजना", "खेती", "कृषि"], a: "किसान सम्मान योजना (₹6000/वर्ष), फसल बीमा योजना और ग्रामीण रोजगार गारंटी उपलब्ध हैं।" },
+            { q: ["आवास योजना", "घर", "मकान"], a: "आवास ग्रामीण योजना में ₹1,20,000 मिलते हैं। BPL और ₹3,00,000 से कम आय वालों के लिए।" },
+            { q: ["पढ़ाई", "छात्रवृत्ति", "scholarship"], a: "SC/ST छात्रवृत्ति (₹50,000/वर्ष) और डिजिटल साक्षरता कार्यक्रम उपलब्ध हैं।" },
+            { q: ["पेंशन", "बुजुर्ग", "वृद्धा"], a: "वरिष्ठ नागरिक पेंशन ₹3,000/माह — 60+ उम्र और ₹2,00,000 से कम आय वालों के लिए।" },
+            { q: ["महिला योजना", "औरत", "गर्भवती"], a: "महिला शक्ति योजना (₹5,000), मातृत्व लाभ (₹6,000) और स्वरोजगार योजनाएं उपलब्ध हैं।" },
+            { q: ["आवेदन कैसे करें", "apply"], a: "12 प्रश्नों के उत्तर दें, पात्र योजनाएं दिखेंगी। दस्तावेज अपलोड करें, फिर आवेदन करें!" },
+            { q: ["लाभ कितना मिलेगा", "probability"], a: "लाभ प्रतिशत = 60% पात्रता + 40% दस्तावेज पूर्णता। सभी दस्तावेज अपलोड करें!" },
+        ],
+        kn: [
+            { q: ["ನಾನು ಅರ್ಹನೇ", "ಯೋಜನೆ ಸಿಗುತ್ತದೆಯೇ", "eligible"], a: "ನಿಮ್ಮ ಉತ್ತರಗಳ ಆಧಾರದ ಮೇಲೆ 15+ ಯೋಜನೆಗಳಲ್ಲಿ ಅರ್ಹತೆ ಪರಿಶೀಲಿಸುತ್ತೇನೆ. ಎಲ್ಲಾ ಪ್ರಶ್ನೆಗಳಿಗೆ ಉತ್ತರಿಸಿ!" },
+            { q: ["ಎಷ್ಟು ಯೋಜನೆಗಳು", "ಪಟ್ಟಿ"], a: "15 ಸರ್ಕಾರಿ ಯೋಜನೆಗಳಿವೆ — ರೈತರು, ಮಹಿಳೆಯರು, ಹಿರಿಯರು, ವಿಕಲಚೇತನರಿಗೆ." },
+            { q: ["ಯಾವ ದಾಖಲೆಗಳು", "document"], a: "ಆಧಾರ್ ಕಾರ್ಡ್, ಆದಾಯ ಪ್ರಮಾಣಪತ್ರ, BPL ಕಾರ್ಡ್, ಭೂಮಿ ದಾಖಲೆ ಬೇಕಾಗುತ್ತದೆ." },
+            { q: ["ಉಚಿತವೇ", "free"], a: "ಹೌದು! ಸಂಪೂರ್ಣ ಉಚಿತ. ಯಾವುದೇ ಶುಲ್ಕ ಇಲ್ಲ." },
+            { q: ["ರೈತ ಯೋಜನೆ", "ಕೃಷಿ"], a: "ಕಿಸಾನ್ ಸಮ್ಮಾನ್ ₹6000/ವರ್ಷ, ಬೆಳೆ ವಿಮೆ ಮತ್ತು ಗ್ರಾಮೀಣ ಉದ್ಯೋಗ ಖಾತರಿ ಲಭ್ಯ." },
+        ],
+        te: [
+            { q: ["నేను అర్హుడినా", "పథకం వస్తుందా", "eligible"], a: "మీ సమాధానాల ఆధారంగా 15+ పథకాలలో అర్హత తనిఖీ చేస్తాను. అన్ని ప్రశ్నలకు సమాధానం ఇవ్వండి!" },
+            { q: ["ఎన్ని పథకాలు", "జాబితా"], a: "15 ప్రభుత్వ సంక్షేమ పథకాలు ఉన్నాయి — రైతులు, మహిళలు, వృద్ధులు, వికలాంగులకు." },
+            { q: ["ఏ పత్రాలు", "document"], a: "ఆధార్ కార్డ్, ఆదాయ ధృవీకరణ, BPL కార్డ్, భూమి రికార్డ్ అవసరం." },
+            { q: ["ఉచితమా", "free"], a: "అవును! పూర్తిగా ఉచితం. ఎటువంటి రుసుము లేదు." },
+            { q: ["రైతు పథకం", "వ్యవసాయం"], a: "కిసాన్ సమ్మాన్ ₹6000/సంవత్సరం, పంట బీమా మరియు గ్రామీణ ఉపాధి హామీ అందుబాటులో ఉన్నాయి." },
+        ],
+        ta: [
+            { q: ["நான் தகுதியா", "திட்டம் கிடைக்குமா", "eligible"], a: "உங்கள் பதில்களின் அடிப்படையில் 15+ திட்டங்களில் தகுதியை சரிபார்ப்பேன். அனைத்து கேள்விகளுக்கும் பதிலளியுங்கள்!" },
+            { q: ["எத்தனை திட்டங்கள்", "பட்டியல்"], a: "15 அரசு நல திட்டங்கள் உள்ளன — விவசாயிகள், பெண்கள், முதியோர், மாற்றுத்திறனாளிகளுக்கு." },
+            { q: ["என்ன ஆவணங்கள்", "document"], a: "ஆதார் அட்டை, வருமான சான்றிதழ், BPL அட்டை, நில ஆவணம் தேவை." },
+            { q: ["இலவசமா", "free"], a: "ஆம்! முற்றிலும் இலவசம். எந்த கட்டணமும் இல்லை." },
+            { q: ["விவசாய திட்டம்", "கிசான்"], a: "கிசான் சம்மான் ₹6000/ஆண்டு, பயிர் காப்பீடு மற்றும் கிராமப்புற வேலை உறுதி கிடைக்கும்." },
+        ],
+    };
+
+    // ──── Voice Toggle ────
+    document.getElementById('voiceToggle').addEventListener('click', function () {
+        voiceEnabled = !voiceEnabled;
+        this.classList.toggle('speaking', voiceEnabled);
+        this.innerHTML = voiceEnabled ? '<i class="fas fa-volume-up"></i>' : '<i class="fas fa-volume-mute"></i>';
+    });
+
+    // ──── Chat Messages ────
+    function addMessage(text, type) {
+        const div = document.createElement('div');
+        div.className = `message message-${type}`;
+        if (type === 'bot') {
+            div.innerHTML = `<div class="msg-avatar">🤖</div><div class="bubble">${text}</div>`;
+            if (voiceEnabled) speakText(text, LANG);
+        } else {
+            div.innerHTML = `<div class="bubble">${text}</div>`;
+        }
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // ──── Full UI Translation Dictionary ────
+    const i18n = {
+        en: {
+            progress: (n, t) => `Question ${n} of ${t}`,
+            chatTitle: 'Jan Suvidha Assistant',
+            chatSubtitle: 'Helping you find the right schemes',
+            placeholder_text: 'Type your answer here...',
+            placeholder_number: 'Type a number...',
+            placeholder_yesno: 'Type yes or no...',
+            placeholder_select: 'Type your choice or click an option below...',
+            voiceHint: '⌨️ Type your answer above, click an option, or 🎤 tap mic to speak',
+            qaStatus: 'Ask me anything about schemes!',
+            qaMicLabel: 'Tap to speak',
+            qaLabel: 'Ask Me',
+            voiceUnsupported: 'Voice input not supported in your browser. Please type your answer.',
+            greeting: `Hello! I'm your Jan Suvidha assistant. I'll ask you a few simple questions to find government schemes you're eligible for. You can type below or tap the mic to speak. Let's begin! 🙏`,
+        },
+        hi: {
+            progress: (n, t) => `प्रश्न ${n} / ${t}`,
+            chatTitle: 'जन सुविधा सहायक',
+            chatSubtitle: 'आपको सही योजनाएं खोजने में मदद',
+            placeholder_text: 'यहाँ अपना उत्तर टाइप करें...',
+            placeholder_number: 'संख्या टाइप करें...',
+            placeholder_yesno: 'हाँ या नहीं टाइप करें...',
+            placeholder_select: 'अपना विकल्प टाइप करें या नीचे क्लिक करें...',
+            voiceHint: '⌨️ ऊपर टाइप करें, विकल्प पर क्लिक करें, या 🎤 माइक से बोलें',
+            qaStatus: 'योजनाओं के बारे में कुछ भी पूछें!',
+            qaMicLabel: 'बोलने के लिए टैप करें',
+            qaLabel: 'पूछें',
+            voiceUnsupported: 'आपका ब्राउज़र वॉयस इनपुट को सपोर्ट नहीं करता। कृपया टाइप करें।',
+            greeting: 'नमस्ते! मैं आपका जन सुविधा सहायक हूँ। मैं आपसे कुछ सरल प्रश्न पूछूंगा ताकि आप पात्र सरकारी योजनाएं पा सकें। नीचे टाइप करें या माइक से बोलें। शुरू करते हैं! 🙏',
+        },
+        kn: {
+            progress: (n, t) => `ಪ್ರಶ್ನೆ ${n} ರಲ್ಲಿ ${t}`,
+            chatTitle: 'ಜನ ಸುವಿಧಾ ಸಹಾಯಕ',
+            chatSubtitle: 'ಸರಿಯಾದ ಯೋಜನೆಗಳನ್ನು ಹುಡುಕಲು ಸಹಾಯ',
+            placeholder_text: 'ಇಲ್ಲಿ ಉತ್ತರ ನಮೂದಿಸಿ...',
+            placeholder_number: 'ಸಂಖ್ಯೆ ನಮೂದಿಸಿ...',
+            placeholder_yesno: 'ಹೌದು ಅಥವಾ ಇಲ್ಲ ನಮೂದಿಸಿ...',
+            placeholder_select: 'ಆಯ್ಕೆ ನಮೂದಿಸಿ ಅಥವಾ ಕೆಳಗೆ ಕ್ಲಿಕ್ ಮಾಡಿ...',
+            voiceHint: '⌨️ ಮೇಲೆ ಟೈಪ್ ಮಾಡಿ ಅಥವಾ 🎤 ಮೈಕ್ ಒತ್ತಿ ಮಾತನಾಡಿ',
+            qaStatus: 'ಯೋಜನೆಗಳ ಬಗ್ಗೆ ಏನಾದರೂ ಕೇಳಿ!',
+            qaMicLabel: 'ಮಾತನಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ',
+            qaLabel: 'ಕೇಳಿ',
+            voiceUnsupported: 'ನಿಮ್ಮ ಬ್ರೌಸರ್ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಬೆಂಬಲಿಸುವುದಿಲ್ಲ. ದಯವಿಟ್ಟು ಟೈಪ್ ಮಾಡಿ.',
+            greeting: 'ನಮಸ್ತೆ! ನಾನು ನಿಮ್ಮ ಜನ ಸುವಿಧಾ ಸಹಾಯಕ. ನಿಮಗೆ ಅರ್ಹ ಸರಕಾರಿ ಯೋಜನೆಗಳನ್ನು ಹುಡುಕಲು ಕೆಲವು ಸರಳ ಪ್ರಶ್ನೆಗಳನ್ನು ಕೇಳುತ್ತೇನೆ. ಟೈಪ್ ಮಾಡಿ ಅಥವಾ ಮೈಕ್ ಬಳಸಿ. ಪ್ರಾರಂಭಿಸೋಣ! 🙏',
+        },
+        te: {
+            progress: (n, t) => `ప్రశ్న ${n} / ${t}`,
+            chatTitle: 'జన సువిధా సహాయకుడు',
+            chatSubtitle: 'సరైన పథకాలు కనుగొనడంలో సహాయం',
+            placeholder_text: 'ఇక్కడ సమాధానం టైప్ చేయండి...',
+            placeholder_number: 'సంఖ్యను టైప్ చేయండి...',
+            placeholder_yesno: 'అవును లేదా కాదు టైప్ చేయండి...',
+            placeholder_select: 'ఎంపిక టైప్ చేయండి లేదా క్రింద క్లిక్ చేయండి...',
+            voiceHint: '⌨️ పైన టైప్ చేయండి లేదా 🎤 మైక్ నొక్కి మాట్లాడండి',
+            qaStatus: 'పథకాల గురించి ఏదైనా అడగండి!',
+            qaMicLabel: 'మాట్లాడటానికి నొక్కండి',
+            qaLabel: 'అడగండి',
+            voiceUnsupported: 'మీ బ్రౌజర్ వాయిస్ ఇన్‌పుట్‌కు మద్దతు ఇవ్వదు. దయచేసి టైప్ చేయండి.',
+            greeting: 'నమస్కారం! నేను మీ జన సువిధా సహాయకుడిని. మీకు అర్హమైన ప్రభుత్వ పథకాలు కనుగొనడానికి కొన్ని సాధారణ ప్రశ్నలు అడుగుతాను. టైప్ చేయండి లేదా మైక్ ఉపయోగించండి. ప్రారంభిద్దాం! 🙏',
+        },
+        ta: {
+            progress: (n, t) => `கேள்வி ${n} / ${t}`,
+            chatTitle: 'ஜன் சுவிதா உதவியாளர்',
+            chatSubtitle: 'சரியான திட்டங்களை கண்டறிய உதவுகிறோம்',
+            placeholder_text: 'இங்கே உங்கள் பதிலை தட்டச்சு செய்யுங்கள்...',
+            placeholder_number: 'எண்ணை தட்டச்சு செய்யுங்கள்...',
+            placeholder_yesno: 'ஆம் அல்லது இல்லை தட்டச்சு செய்யுங்கள்...',
+            placeholder_select: 'தேர்வை தட்டச்சு செய்யுங்கள் அல்லது கீழே கிளிக் செய்யுங்கள்...',
+            voiceHint: '⌨️ மேலே தட்டச்சு செய்யுங்கள் அல்லது 🎤 மைக்கை தட்டி பேசுங்கள்',
+            qaStatus: 'திட்டங்களைப் பற்றி எதுவும் கேளுங்கள்!',
+            qaMicLabel: 'பேச தட்டுங்கள்',
+            qaLabel: 'கேளுங்கள்',
+            voiceUnsupported: 'உங்கள் உலாவி குரல் உள்ளீட்டை ஆதரிக்கவில்லை. தயவுசெய்து தட்டச்சு செய்யுங்கள்.',
+            greeting: 'வணக்கம்! நான் உங்கள் ஜன் சுவிதா உதவியாளர். நீங்கள் தகுதியான அரசு திட்டங்களை கண்டறிய சில எளிய கேள்விகள் கேட்போம். கீழே தட்டச்சு செய்யுங்கள் அல்லது மைக் பயன்படுத்துங்கள். தொடங்குவோம்! 🙏',
+        },
+    };
+    const T = i18n[LANG] || i18n.en;
+
+    function applyI18n() {
+        document.getElementById('chatTitle').textContent = T.chatTitle;
+        document.getElementById('chatSubtitle').textContent = T.chatSubtitle;
+        document.getElementById('voiceHint').innerHTML = T.voiceHint;
+        document.getElementById('qaStatus').textContent = T.qaStatus;
+        document.getElementById('qaMicLabel').textContent = T.qaMicLabel;
+        document.querySelector('.qa-label')?.setAttribute('data-label', T.qaLabel);
+        document.querySelector('.qa-label').textContent = T.qaLabel;
+        // QA panel title
+        const qaPanelTitle = document.getElementById('qaPanelTitle');
+        if (qaPanelTitle) {
+            const qaPanelTitles = { en: 'Voice Q&A Assistant', hi: 'वॉइस Q&A सहायक', kn: 'ಧ್ವನಿ Q&A ಸಹಾಯಕ', te: 'వాయిస్ Q&A సహాయకుడు', ta: 'குரல் Q&A உதவியாளர்' };
+            qaPanelTitle.textContent = qaPanelTitles[LANG] || qaPanelTitles.en;
+        }
+        // Set initial progress label
+        document.getElementById('progressLabel').textContent = T.progress(1, TOTAL_QUESTIONS);
+    }
+    applyI18n();
+
+
+    function updateProgress() {
+        const pct = Math.round((questionCount / TOTAL_QUESTIONS) * 100);
+        document.getElementById('progressFill').style.width = pct + '%';
+        document.getElementById('progressLabel').textContent = T.progress(questionCount + 1, TOTAL_QUESTIONS);
+    }
+
+    // Current question type tracker
+    let currentType = 'text';
+    let currentOptions = [];
+
+    // ──── Input Display ────
+    function showInput(type, options) {
+        currentType = type;
+        currentOptions = options || [];
+        optionsContainer.innerHTML = '';
+
+        // Always show the send button
+        sendBtn.style.display = 'flex';
+
+        // Set placeholder based on question type
+        if (type === 'number') {
+            textInput.placeholder = T.placeholder_number;
+            textInput.type = 'number';
+        } else if (type === 'yesno') {
+            textInput.placeholder = T.placeholder_yesno;
+            textInput.type = 'text';
+        } else if (type === 'select') {
+            textInput.placeholder = T.placeholder_select;
+            textInput.type = 'text';
+        } else {
+            textInput.placeholder = T.placeholder_text;
+            textInput.type = 'text';
+        }
+        textInput.value = '';
+        textInput.focus();
+        textInput.onkeydown = (e) => { if (e.key === 'Enter') sendTypedAnswer(); };
+
+        if (type === 'select' && options && options.length > 0) {
+            const grid = document.createElement('div');
+            grid.className = 'options-grid';
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = opt;
+                btn.onclick = () => { textInput.value = ''; submitAnswer(opt); };
+                grid.appendChild(btn);
+            });
+            optionsContainer.appendChild(grid);
+        } else if (type === 'yesno') {
+            const div = document.createElement('div');
+            div.className = 'yesno-btns';
+            const yesLabels = { en: 'Yes ✅', hi: 'हाँ ✅', kn: 'ಹೌದು ✅', te: 'అవును ✅', ta: 'ஆம் ✅' };
+            const noLabels = { en: 'No ❌', hi: 'नहीं ❌', kn: 'ಇಲ್ಲ ❌', te: 'కాదు ❌', ta: 'இல்లை ❌' };
+            div.innerHTML = `
+            <button class="yesno-btn yes" onclick="textInput.value=''; submitAnswer(true)">${yesLabels[LANG] || yesLabels.en}</button>
+            <button class="yesno-btn no" onclick="textInput.value=''; submitAnswer(false)">${noLabels[LANG] || noLabels.en}</button>
+        `;
+            optionsContainer.appendChild(div);
+        }
+    }
+
+    // Unified send function — handles all types from the text input
+    function sendTypedAnswer() {
+        const raw = textInput.value.trim();
+        if (!raw) return;
+        textInput.value = '';
+
+        if (currentType === 'number') {
+            const num = parseFloat(raw.replace(/,/g, ''));
+            if (!isNaN(num)) { submitAnswer(num); return; }
+            addMessage('⚠️ Please enter a valid number.', 'bot');
+            return;
+        }
+
+        if (currentType === 'yesno') {
+            const lower = raw.toLowerCase();
+            const yesWords = ['yes', 'y', 'haan', 'haan', 'ha', 'हाँ', 'हां', 'हा', 'ಹೌದು', 'అవును', 'ஆம்', '1', 'true'];
+            const noWords = ['no', 'n', 'nahi', 'nahi', 'na', 'नहीं', 'ना', 'ಇಲ್ಲ', 'కాదు', 'இல்லை', '0', 'false'];
+            if (yesWords.some(w => lower === w || lower.startsWith(w))) { submitAnswer(true); return; }
+            if (noWords.some(w => lower === w || lower.startsWith(w))) { submitAnswer(false); return; }
+            addMessage('⚠️ Please answer with Yes or No.', 'bot');
+            return;
+        }
+
+        if (currentType === 'select' && currentOptions.length > 0) {
+            const lower = raw.toLowerCase();
+            const match = currentOptions.find(o => o.toLowerCase() === lower || o.toLowerCase().startsWith(lower));
+            if (match) { submitAnswer(match); return; }
+
+            // Differentiate: geo fields → "not available", other fields → "out of context"
+            const geoKeys = ['state', 'district', 'village'];
+            if (geoKeys.includes(currentKey)) {
+                const areaMsg = {
+                    en: `⚠️ Sorry, we are not yet available in "${raw}". Please choose from the listed options.`,
+                    hi: `⚠️ क्षमा करें, हम अभी "${raw}" में उपलब्ध नहीं हैं। कृपया सूची से चुनें।`,
+                    kn: `⚠️ ಕ್ಷಮಿಸಿ, ನಾವು ಇನ್ನೂ "${raw}" ನಲ್ಲಿ ಲಭ್ಯವಿಲ್ಲ. ಪಟ್ಟಿಯಿಂದ ಆಯ್ಕೆ ಮಾಡಿ.`,
+                    te: `⚠️ మన్నించండి, మేము ఇంకా "${raw}" లో అందుబాటులో లేము. జాబితా నుంచి ఎంచుకోండి.`,
+                    ta: `⚠️ மன்னிக்கவும், எங்களுக்கு இன்னும் "${raw}" இல் சேவை இல்லை. பட்டியலிலிருந்து தேர்வு செய்யுங்கள்.`,
+                };
+                addMessage(areaMsg[LANG] || areaMsg.en, 'bot');
+            } else {
+                const ctxMsg = {
+                    en: `⚠️ That answer is out of context. Please select one of: ${currentOptions.slice(0, 4).join(', ')}.`,
+                    hi: `⚠️ यह उत्तर संदर्भ से बाहर है। कृपया इनमें से चुनें: ${currentOptions.slice(0, 4).join(', ')}।`,
+                    kn: `⚠️ ಈ ಉತ್ತರ ಸಂದರ್ಭಕ್ಕೆ ಸೂಕ್ತವಲ್ಲ. ದಯವಿಟ್ಟು ಆಯ್ಕೆ ಮಾಡಿ: ${currentOptions.slice(0, 4).join(', ')}.`,
+                    te: `⚠️ ఈ సమాధానం సందర్భానికి సరిపోదు. దయచేసి ఎంచుకోండి: ${currentOptions.slice(0, 4).join(', ')}.`,
+                    ta: `⚠️ இந்த பதில் தொடர்புடையது அல்ல. தயவுசெய்து தேர்வு செய்யுங்கள்: ${currentOptions.slice(0, 4).join(', ')}.`,
+                };
+                addMessage(ctxMsg[LANG] || ctxMsg.en, 'bot');
+            }
+            return;
+        }
+
+        submitAnswer(raw);
+    }
+
+    function sendTextAnswer() { sendTypedAnswer(); }
+    function sendNumberAnswer() { sendTypedAnswer(); }
+
+    let currentKey = '';
+
+    async function askNextQuestion(lastAnswer, lastKey, lastType, lastQuestion, lastOptions) {
+        updateProgress();
+        try {
+            const resp = await fetch('/api/ask-question/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+                body: JSON.stringify({
+                    current_responses: currentResponses,
+                    language: LANG,
+                    user_id: USER_ID,
+                    last_answer: lastAnswer !== undefined ? lastAnswer : null,
+                    last_key: lastKey || null,
+                    last_type: lastType || null,
+                    last_question: lastQuestion || null,
+                    last_options: lastOptions || []
+                })
+            });
+            const data = await resp.json();
+
+            // Server-side validation error (out-of-context / invalid answer)
+            if (data.validation_error) {
+                // Remove the user's last message and roll back
+                const msgs = chatMessages.querySelectorAll('.message-user');
+                if (msgs.length) msgs[msgs.length - 1].remove();
+                if (currentKey in currentResponses) delete currentResponses[currentKey];
+                questionCount = Math.max(0, questionCount - 1);
+                addMessage(`⚠️ ${data.error_message}`, 'bot');
+                // Restore the previous question input
+                showInput(data.type || currentType, data.options || currentOptions);
+                return;
+            }
+
+            if (data.done) {
+                addMessage(data.message || 'All questions answered! Finding your schemes...', 'bot');
+                optionsContainer.innerHTML = '';
+                setTimeout(checkEligibility, 1500);
+                return;
+            }
+            currentKey = data.key;
+            addMessage(data.question, 'bot');
+            showInput(data.type, data.options);
+        } catch (err) {
+            addMessage('Something went wrong. Please refresh.', 'bot');
+        }
+    }
+
+    function submitAnswer(value) {
+        let displayVal = value;
+        if (typeof value === 'boolean') displayVal = value ? 'Yes ✅' : 'No ❌';
+        addMessage(String(displayVal), 'user');
+        const prevKey = currentKey;
+        const prevType = currentType;
+        const prevOptions = [...currentOptions];
+        const prevQuestion = chatMessages.querySelector('.message-bot:last-child .bubble')?.textContent || '';
+        currentResponses[prevKey] = value;
+        questionCount++;
+        setTimeout(() => askNextQuestion(value, prevKey, prevType, prevQuestion, prevOptions), 400);
+    }
+
+    async function checkEligibility() {
+        addMessage('🔍 Analyzing your eligibility...', 'bot');
+        try {
+            const resp = await fetch('/api/check-eligibility/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+                body: JSON.stringify({ user_id: USER_ID, responses: currentResponses, language: LANG })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                const msgs = {
+                    en: `Great news! You are eligible for ${data.total_eligible} scheme(s). Let me show you the details.`,
+                    hi: `बेहतरीन! आप ${data.total_eligible} योजनाओं के लिए पात्र हैं।`,
+                    kn: `ಒಳ್ಳೆಯ ಸುದ್ದಿ! ನೀವು ${data.total_eligible} ಯೋಜನೆಗಳಿಗೆ ಅರ್ಹರು.`,
+                    te: `శుభవార్త! మీరు ${data.total_eligible} పథకాలకు అర్హులు.`,
+                    ta: `நல்ல செய்தி! நீங்கள் ${data.total_eligible} திட்டங்களுக்கு தகுதி பெற்றுள்ளீர்கள்.`,
+                };
+                addMessage(msgs[LANG] || msgs.en, 'bot');
+                setTimeout(() => { window.location.href = '/results/'; }, 2500);
+            } else {
+                addMessage(data.error || 'Unable to check eligibility.', 'bot');
+            }
+        } catch (err) { addMessage('Connection error.', 'bot'); }
+    }
+
+    function getCSRF() {
+        const cookies = document.cookie.split(';');
+        for (let c of cookies) { c = c.trim(); if (c.startsWith('csrftoken=')) return c.substring(10); }
+        return '';
+    }
+
+    // ──── Voice Input for Question Answers (Mic Button) ────
+    let isListening = false;
+
+    function startListening() {
+        const micBtn = document.getElementById('micBtn');
+        const micIcon = document.getElementById('micIcon');
+
+        if (isListening) {
+            stopVoiceInput();
+            micBtn.classList.remove('listening');
+            micIcon.className = 'fas fa-microphone';
+            isListening = false;
+            return;
+        }
+
+        isListening = true;
+        micBtn.classList.add('listening');
+        micIcon.className = 'fas fa-circle recording-dot';
+
+        const success = startVoiceInput(LANG, (transcript, confidence) => {
+            micBtn.classList.remove('listening');
+            micIcon.className = 'fas fa-microphone';
+            isListening = false;
+
+            // Check if it's a Q&A question first
+            const qaAnswer = findQAAnswer(transcript, LANG);
+            if (qaAnswer) {
+                addMessage(transcript, 'user');
+                addMessage(qaAnswer, 'bot');
+                return;
+            }
+
+            const raw = transcript.trim();
+            const lower = raw.toLowerCase();
+
+            // For select questions: do fuzzy matching against options
+            if (currentType === 'select' && currentOptions.length > 0) {
+                const match = currentOptions.find(o =>
+                    o.toLowerCase() === lower ||
+                    o.toLowerCase().includes(lower) ||
+                    lower.includes(o.toLowerCase())
+                );
+                if (match) {
+                    submitAnswer(match);
+                    return;
+                }
+                // No fuzzy match — put in textInput and let sendTypedAnswer handle it
+                textInput.value = raw;
+                sendTypedAnswer();
+                return;
+            }
+
+            // For yes/no — route via textInput/sendTypedAnswer for consistent handling
+            if (currentType === 'yesno') {
+                textInput.value = raw;
+                sendTypedAnswer();
+                return;
+            }
+
+            // For number/text — route through sendTypedAnswer
+            textInput.value = raw;
+            sendTypedAnswer();
+        });
+
+        if (!success) {
+            micBtn.classList.remove('listening');
+            micIcon.className = 'fas fa-microphone';
+            isListening = false;
+            addMessage(T.voiceUnsupported, 'bot');
+        }
+    }
+
+    // ──── Voice Q&A Panel ────
+    function toggleVoiceQA() {
+        const panel = document.getElementById('qaPanel');
+        panel.classList.toggle('hidden');
+        if (!panel.classList.contains('hidden')) showQASuggestions();
+    }
+    function closeQAPanel() { document.getElementById('qaPanel').classList.add('hidden'); }
+
+    function showQASuggestions() {
+        const suggestions = document.getElementById('qaSuggestions');
+        const sampleQs = {
+            en: ["Am I eligible?", "How many schemes?", "What documents needed?", "Is this free?", "Farmer schemes?"],
+            hi: ["क्या मैं पात्र हूँ?", "कितनी योजनाएं?", "कौन से दस्तावेज?", "मुफ्त है?", "किसान योजना?"],
+            kn: ["ನಾನು ಅರ್ಹನೇ?", "ಎಷ್ಟು ಯೋಜನೆ?", "ಯಾವ ದಾಖಲೆ?", "ಉಚಿತವೇ?", "ರೈತ ಯೋಜನೆ?"],
+            te: ["నేను అర్హుడినా?", "ఎన్ని పథకాలు?", "ఏ పత్రాలు?", "ఉచితమా?", "రైతు పథకం?"],
+            ta: ["நான் தகுதியா?", "எத்தனை திட்டம்?", "என்ன ஆவணம்?", "இலவசமா?", "விவசாய திட்டம்?"],
+        };
+        const qs = sampleQs[LANG] || sampleQs.en;
+        const tryAskingLabel = {
+            en: 'Try asking:', hi: 'पूछें:', kn: 'ಕೇಳಿ:', te: 'అడగండి:', ta: 'கேளுங்கள்:'
+        };
+        suggestions.innerHTML = `<p style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">${tryAskingLabel[LANG] || 'Try asking:'}</p>` +
+            qs.map(q => `<button class="qa-chip" onclick="askQAQuestion('${q.replace(/'/g, "\\'")}')">${q}</button>`).join('');
+    }
+
+    function askQAQuestion(question) {
+        addQAMessage(question, 'user');
+        const answer = findQAAnswer(question, LANG);
+        setTimeout(() => {
+            const fallbackMsg = {
+                en: "I'm not sure about that. Try asking about schemes, eligibility, or documents!",
+                hi: "मुझे यकीन नहीं। योजनाओं, पात्रता या दस्तावेजों के बारे में पूछें!",
+                kn: "ನನಗೆ ಖಚಿತವಿಲ್ಲ. ಯೋಜನೆ, ಅರ್ಹತೆ ಅಥವಾ ದಾಖಲೆಗಳ ಬಗ್ಗೆ ಕೇಳಿ!",
+                te: "నాకు తెలియదు. పథకాలు, అర్హత లేదా పత్రాల గురించి అడగండి!",
+                ta: "எனக்கு தெரியவில்லை. திட்டங்கள், தகுதி அல்லது ஆவணங்களைப் பற்றி கேளுங்கள்!",
+            };
+            addQAMessage(answer || fallbackMsg[LANG] || fallbackMsg.en, 'bot');
+            if (voiceEnabled) speakText(answer, LANG);
+        }, 500);
+    }
+
+    function addQAMessage(text, type) {
+        const container = document.getElementById('qaMessages');
+        const div = document.createElement('div');
+        div.className = `qa-msg qa-${type}`;
+        div.innerHTML = type === 'bot' ? `<span class="qa-icon">🤖</span>${text}` : text;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function startQAListening() {
+        const micBtn = document.getElementById('qaMicBtn');
+        const micIcon = document.getElementById('qaMicIcon');
+        const label = document.getElementById('qaMicLabel');
+
+        micBtn.classList.add('listening');
+        micIcon.className = 'fas fa-circle recording-dot';
+        label.textContent = 'Listening...';
+        document.getElementById('qaStatus').textContent = 'Listening...';
+
+        startVoiceInput(LANG, (transcript) => {
+            micBtn.classList.remove('listening');
+            micIcon.className = 'fas fa-microphone';
+            label.textContent = 'Tap to speak';
+            document.getElementById('qaStatus').textContent = 'Ask me anything!';
+            askQAQuestion(transcript);
+        });
+    }
+
+    function findQAAnswer(question, lang) {
+        const q = question.toLowerCase();
+        // Search in current language first, then English
+        const langQAs = voiceQA[lang] || [];
+        const enQAs = voiceQA.en || [];
+        const allQAs = [...langQAs, ...enQAs];
+
+        for (const qa of allQAs) {
+            for (const keyword of qa.q) {
+                if (q.includes(keyword.toLowerCase())) {
+                    return qa.a;
+                }
+            }
+        }
+        return null;
+    }
+
+    // ──── Welcome & Start ────
+    const welcomeMessages = {
+        en: "Hello! I'm your Jan Suvidha assistant. I'll ask simple questions to find schemes for you. You can also tap the mic button to speak your answers, or ask me questions like 'Am I eligible?' Let's begin!",
+        hi: "नमस्ते! मैं जन सुविधा सहायक हूँ। मैं सरल प्रश्न पूछूँगा। आप माइक बटन दबाकर बोल सकते हैं या पूछ सकते हैं 'क्या मैं पात्र हूँ?'",
+        kn: "ನಮಸ್ಕಾರ! ನಾನು ಜನ ಸುವಿಧಾ ಸಹಾಯಕ. ಸರಳ ಪ್ರಶ್ನೆಗಳನ್ನು ಕೇಳುತ್ತೇನೆ. ಮೈಕ್ ಒತ್ತಿ ಮಾತನಾಡಿ!",
+        te: "నమస్కారం! నేను జన సువిధా సహాయకుడిని. సరళ ప్రశ్నలు అడుగుతాను. మైక్ నొక్కి మాట్లాడండి!",
+        ta: "வணக்கம்! நான் ஜன சுவிதா உதவியாளர். எளிய கேள்விகள் கேட்பேன். மைக் அழுத்தி பேசுங்கள்!",
+    };
+
+    addMessage(welcomeMessages[LANG] || welcomeMessages.en, 'bot');
+    setTimeout(askNextQuestion, 2000);
+</script>
+
+<style>
+    /* Mic button */
+    .btn-mic {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--gradient-primary);
+        color: #fff;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+        flex-shrink: 0;
+    }
+
+    .btn-mic:hover {
+        transform: scale(1.08);
+        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-mic.listening {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        animation: micPulse 1s ease-in-out infinite;
+    }
+
+    @keyframes micPulse {
+
+        0%,
+        100% {
+            transform: scale(1)
+        }
+
+        50% {
+            transform: scale(1.1)
+        }
+    }
+
+    .recording-dot {
+        animation: blink 0.8s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+
+        0%,
+        100% {
+            opacity: 1
+        }
+
+        50% {
+            opacity: 0.3
+        }
+    }
+
+    /* Voice Q&A hint */
+    .voice-qa-hint {
+        text-align: center;
+        font-size: 12px;
+        color: var(--text-muted);
+        padding: 8px;
+        margin-top: 8px;
+        opacity: 0.7;
+    }
+
+    .voice-qa-hint i {
+        color: var(--accent);
+        margin-right: 4px;
+    }
+
+    /* Voice Q&A FAB */
+    .voice-qa-fab {
+        position: fixed;
+        bottom: 32px;
+        right: 32px;
+        z-index: 1000;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--gradient-accent);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        cursor: pointer;
+        box-shadow: 0 6px 24px rgba(16, 185, 129, 0.4);
+        transition: all 0.3s;
+    }
+
+    .voice-qa-fab:hover {
+        transform: scale(1.08);
+    }
+
+    .qa-label {
+        position: absolute;
+        right: 64px;
+        background: var(--card-bg);
+        color: var(--text-primary);
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .fab-pulse-qa {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: rgba(16, 185, 129, 0.2);
+        animation: fabPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes fabPulse {
+
+        0%,
+        100% {
+            transform: scale(1);
+            opacity: 0.6
+        }
+
+        50% {
+            transform: scale(1.4);
+            opacity: 0
+        }
+    }
+
+    /* Q&A Panel */
+    .qa-panel {
+        position: fixed;
+        bottom: 100px;
+        right: 32px;
+        z-index: 1001;
+        width: 400px;
+        max-width: calc(100vw - 40px);
+        max-height: 500px;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        animation: panelSlideUp 0.3s ease;
+    }
+
+    @keyframes panelSlideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px)
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0)
+        }
+    }
+
+    .qa-panel.hidden {
+        display: none;
+    }
+
+    .qa-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 18px;
+        background: rgba(16, 185, 129, 0.1);
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .qa-header h3 {
+        font-size: 14px;
+        font-weight: 700;
+        margin: 0;
+        color: var(--text-primary);
+    }
+
+    .qa-header p {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin: 0;
+    }
+
+    .qa-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: var(--gradient-accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+    }
+
+    .qa-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 16px;
+        min-height: 120px;
+        max-height: 220px;
+    }
+
+    .qa-msg {
+        margin: 6px 0;
+        padding: 8px 12px;
+        border-radius: 12px;
+        font-size: 13px;
+        line-height: 1.5;
+        max-width: 85%;
+    }
+
+    .qa-user {
+        background: rgba(59, 130, 246, 0.15);
+        margin-left: auto;
+        text-align: right;
+        border-radius: 12px 12px 2px 12px;
+        color: var(--text-primary);
+    }
+
+    .qa-bot {
+        background: rgba(16, 185, 129, 0.1);
+        border-radius: 12px 12px 12px 2px;
+        color: var(--text-secondary);
+    }
+
+    .qa-icon {
+        margin-right: 6px;
+    }
+
+    .qa-input {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 12px;
+        gap: 6px;
+    }
+
+    .qa-mic-btn {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        border: none;
+        background: var(--gradient-accent);
+        color: #fff;
+        font-size: 22px;
+        cursor: pointer;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .qa-mic-btn.listening {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+
+    .mic-ring {
+        position: absolute;
+        inset: -6px;
+        border-radius: 50%;
+        border: 2px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .qa-mic-btn.listening .mic-ring {
+        border-color: rgba(239, 68, 68, 0.4);
+        animation: ringPulse 1s ease-in-out infinite;
+    }
+
+    @keyframes ringPulse {
+
+        0%,
+        100% {
+            transform: scale(1);
+            opacity: 1
+        }
+
+        50% {
+            transform: scale(1.2);
+            opacity: 0.4
+        }
+    }
+
+    #qaMicLabel {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+
+    .qa-suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 8px 16px 14px;
+    }
+
+    .qa-chip {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.2);
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .qa-chip:hover {
+        background: rgba(59, 130, 246, 0.2);
+        color: var(--text-primary);
+    }
+
+    /* Language bar strip */
+    .chat-lang-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 16px;
+        background: rgba(15, 23, 42, 0.6);
+        border-left: 1px solid var(--border-color);
+        border-right: 1px solid var(--border-color);
+        overflow-x: auto;
+    }
+
+    .chat-lang-label {
+        color: var(--text-muted);
+        font-size: 14px;
+        margin-right: 4px;
+        flex-shrink: 0;
+    }
+
+    .chat-lang-btn {
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid var(--border-color);
+        background: transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.3s;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .chat-lang-btn:hover {
+        border-color: var(--primary-light);
+        color: var(--text-primary);
+        background: rgba(59, 130, 246, 0.08);
+    }
+
+    .chat-lang-btn.active {
+        background: var(--primary-light);
+        color: #fff;
+        border-color: var(--primary-light);
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+</style>
+{% endblock %}

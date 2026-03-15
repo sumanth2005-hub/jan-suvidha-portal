@@ -1,0 +1,612 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Upload Documents — Jan Suvidha Portal{% endblock %}
+{% block body_class %}documents-page{% endblock %}
+
+{% block content %}
+<div class="container">
+    <nav class="navbar" style="position:relative;margin-bottom:24px;">
+        <div class="navbar-brand">
+            <div class="icon">🏛️</div><span>Jan Suvidha</span>
+        </div>
+        <div class="navbar-links">
+            <a href="/results/" class="btn btn-outline" style="padding:8px 20px;font-size:13px;">
+                <i class="fas fa-arrow-left"></i> Back to Results
+            </a>
+        </div>
+    </nav>
+
+    <!-- Scheme Info Header -->
+    <div class="doc-header card" id="schemeHeader">
+        <div class="doc-scheme-info">
+            <span class="scheme-category" id="schemeCat">Loading...</span>
+            <h2 id="schemeName">Loading scheme details...</h2>
+            <p id="schemeDesc" style="color:var(--text-secondary);margin-top:6px;font-size:14px;"></p>
+            <div class="scheme-meta" style="margin-top:12px;">
+                <div class="meta-item"><i class="fas fa-rupee-sign"></i> Benefit: <strong id="schemeBenefit">—</strong>
+                </div>
+                <div class="meta-item"><i class="fas fa-calendar"></i> Last Date: <strong id="schemeDate">—</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Benefit Probability Dashboard -->
+    <div class="card prob-dashboard" id="probDashboard">
+        <h3><i class="fas fa-chart-line"></i> Your Benefit Probability</h3>
+        <div class="prob-main">
+            <div class="prob-circle">
+                <svg viewBox="0 0 120 120" width="120" height="120">
+                    <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8" />
+                    <circle cx="60" cy="60" r="54" fill="none" stroke="url(#probGrad)" stroke-width="8"
+                        stroke-dasharray="339.292" id="probCircle" stroke-dashoffset="339.292" stroke-linecap="round"
+                        transform="rotate(-90 60 60)" />
+                    <defs>
+                        <linearGradient id="probGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" style="stop-color:#3b82f6" />
+                            <stop offset="100%" style="stop-color:#10b981" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <div class="prob-percent" id="probPercent">0%</div>
+            </div>
+            <div class="prob-breakdown">
+                <div class="prob-row">
+                    <span><i class="fas fa-check-circle" style="color:#10b981"></i> Eligibility Match</span>
+                    <span class="prob-val" id="eligScore">0%</span>
+                </div>
+                <div class="prob-row">
+                    <span><i class="fas fa-file-check" style="color:#3b82f6"></i> Document Completeness</span>
+                    <span class="prob-val" id="docScore">0%</span>
+                </div>
+                <div class="prob-formula-text">
+                    Benefit Probability = (Eligibility × 60%) + (Documents × 40%)
+                </div>
+            </div>
+        </div>
+        <div class="prob-tip" id="probTip">
+            <i class="fas fa-lightbulb"></i> Upload all documents below to maximize your benefit probability!
+        </div>
+    </div>
+
+    <!-- Document Upload Cards -->
+    <div class="doc-section">
+        <h3><i class="fas fa-file-upload"></i> Required Documents</h3>
+        <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">Upload each document to verify and
+            increase your benefit probability</p>
+        <div class="doc-cards" id="docCards">
+            <div class="text-center">
+                <div class="spinner" style="margin:0 auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Apply Button -->
+    <div class="apply-section card" id="applySection" style="display:none;">
+        <div class="apply-content">
+            <div class="apply-info">
+                <h3>🎉 Ready to Apply!</h3>
+                <p>All documents verified. Your benefit probability is at maximum.</p>
+            </div>
+            <button class="btn btn-primary btn-lg apply-btn" onclick="simulateApply()">
+                <i class="fas fa-paper-plane"></i> Apply for This Scheme
+            </button>
+        </div>
+    </div>
+
+    <!-- Applied Success -->
+    <div class="applied-success card" id="appliedSuccess" style="display:none;">
+        <div class="success-icon">✅</div>
+        <h2>Application Submitted!</h2>
+        <p>Your application has been submitted successfully (simulated).</p>
+        <div class="success-details">
+            <div class="detail-item"><span>Application ID:</span><strong id="appId">—</strong></div>
+            <div class="detail-item"><span>Status:</span><strong style="color:#10b981;">Under Review</strong></div>
+            <div class="detail-item"><span>Expected Response:</span><strong>7-14 working days</strong></div>
+        </div>
+        <a href="/results/" class="btn btn-outline mt-3"><i class="fas fa-arrow-left"></i> View Other Schemes</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/voice.js' %}"></script>
+<script>
+    const LANG = '{{ lang }}';
+    const SCHEME_ID = '{{ scheme_id }}';
+    const schemeData = JSON.parse('{{ scheme|escapejs }}');
+
+    const docLabels = {
+        aadhaar_card: { name: 'Aadhaar Card', icon: 'fa-id-card', desc: 'Government-issued identity card' },
+        land_record: { name: 'Land Record', icon: 'fa-map-marked-alt', desc: 'Land ownership document' },
+        bank_passbook: { name: 'Bank Passbook', icon: 'fa-university', desc: 'Savings account passbook first page' },
+        income_certificate: { name: 'Income Certificate', icon: 'fa-file-invoice-dollar', desc: 'Annual income proof from tehsildar' },
+        caste_certificate: { name: 'Caste Certificate', icon: 'fa-certificate', desc: 'SC/ST/OBC caste verification' },
+        crop_sowing_certificate: { name: 'Crop Sowing Certificate', icon: 'fa-seedling', desc: 'Certificate from local agriculture officer' },
+        bpl_card: { name: 'BPL Card', icon: 'fa-address-card', desc: 'Below Poverty Line ration card' },
+        age_proof: { name: 'Age Proof', icon: 'fa-calendar-alt', desc: 'Birth certificate or school leaving certificate' },
+        disability_certificate: { name: 'Disability Certificate', icon: 'fa-wheelchair', desc: '40%+ disability medical certificate' },
+        pregnancy_certificate: { name: 'Pregnancy Certificate', icon: 'fa-baby', desc: 'Medical certificate from registered doctor' },
+        education_certificate: { name: 'Education Certificate', icon: 'fa-graduation-cap', desc: 'Marksheet or enrollment proof' },
+        business_plan: { name: 'Business Plan', icon: 'fa-briefcase', desc: 'Proposed business plan document' },
+        address_proof: { name: 'Address Proof', icon: 'fa-map-pin', desc: 'Voter ID, electricity bill, or ration card' },
+        family_id_card: { name: 'Family ID Card', icon: 'fa-users', desc: 'Family identification document' },
+    };
+
+    let uploadedDocs = {};
+    let matchScore = 70; // default
+
+    // Initialize page
+    function initPage() {
+        if (!schemeData || !schemeData.scheme_id) {
+            document.getElementById('schemeHeader').innerHTML = '<p>Scheme not found.</p>';
+            return;
+        }
+
+        // Populate scheme info
+        const name = schemeData.name ? (schemeData.name[LANG] || schemeData.name.en || schemeData.name) : 'Scheme';
+        const desc = schemeData.description ? (schemeData.description[LANG] || schemeData.description.en || '') : '';
+        document.getElementById('schemeName').textContent = name;
+        document.getElementById('schemeDesc').textContent = desc;
+        document.getElementById('schemeCat').textContent = schemeData.category || '';
+        document.getElementById('schemeBenefit').textContent = schemeData.benefit_amount || '—';
+        document.getElementById('schemeDate').textContent = schemeData.last_date || '—';
+
+        // Get eligibility match from session if available
+        matchScore = schemeData.match_score || 70;
+
+        // Render document cards
+        renderDocCards(schemeData.required_documents || []);
+        updateProbability();
+    }
+
+    function renderDocCards(docs) {
+        const container = document.getElementById('docCards');
+        if (docs.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted);">No documents required for this scheme.</p>';
+            return;
+        }
+
+        container.innerHTML = docs.map(docKey => {
+            const info = docLabels[docKey] || { name: docKey, icon: 'fa-file', desc: '' };
+            const uploaded = uploadedDocs[docKey];
+            const statusClass = uploaded ? (uploaded.verified ? 'doc-verified' : 'doc-uploaded') : 'doc-pending';
+            const statusIcon = uploaded ? (uploaded.verified ? '✅' : '⏳') : '📄';
+            const statusText = uploaded ? (uploaded.verified ? 'Verified' : 'Verifying...') : 'Not Uploaded';
+
+            return `<div class="doc-card ${statusClass}" id="doc-${docKey}">
+            <div class="doc-card-left">
+                <div class="doc-icon"><i class="fas ${info.icon}"></i></div>
+                <div class="doc-info">
+                    <div class="doc-name">${info.name}</div>
+                    <div class="doc-desc">${info.desc}</div>
+                    <div class="doc-status">
+                        <span class="status-dot ${statusClass}"></span>
+                        <span>${statusIcon} ${statusText}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="doc-card-right">
+                ${uploaded && uploaded.verified
+                    ? '<span class="verified-badge"><i class="fas fa-check-circle"></i> Verified</span>'
+                    : `<label class="upload-btn">
+                        <input type="file" accept=".pdf,.jpg,.jpeg,.png" onchange="uploadDoc('${docKey}', this)" hidden>
+                        <i class="fas fa-cloud-upload-alt"></i> ${uploaded ? 'Re-upload' : 'Upload'}
+                    </label>`
+                }
+            </div>
+        </div>`;
+        }).join('');
+    }
+
+    async function uploadDoc(docKey, input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        // Show uploading state
+        const card = document.getElementById('doc-' + docKey);
+        card.classList.add('doc-uploading');
+
+        const formData = new FormData();
+        formData.append('scheme_id', SCHEME_ID);
+        formData.append('doc_type', docKey);
+        formData.append('document', file);
+
+        try {
+            const resp = await fetch('/api/upload-document/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCSRF() },
+                body: formData,
+            });
+            const data = await resp.json();
+
+            if (data.success) {
+                // Simulate verification delay
+                uploadedDocs[docKey] = { uploaded: true, verified: false, filename: file.name };
+                renderDocCards(schemeData.required_documents);
+                updateProbability();
+
+                // Simulate verification after 2 seconds
+                setTimeout(() => {
+                    uploadedDocs[docKey].verified = true;
+                    renderDocCards(schemeData.required_documents);
+                    updateProbability();
+                    showVerifiedToast(docKey);
+                }, 2000);
+            }
+        } catch (err) {
+            alert('Upload failed. Please try again.');
+        }
+        card.classList.remove('doc-uploading');
+    }
+
+    function updateProbability() {
+        const totalDocs = schemeData.required_documents ? schemeData.required_documents.length : 0;
+        const verifiedDocs = Object.values(uploadedDocs).filter(d => d.verified).length;
+        const docCompleteness = totalDocs > 0 ? Math.round((verifiedDocs / totalDocs) * 100) : 100;
+
+        const eligPart = (matchScore / 100) * 60;
+        const docPart = (docCompleteness / 100) * 40;
+        const totalProb = Math.round(eligPart + docPart);
+
+        // Animate circle
+        const circle = document.getElementById('probCircle');
+        const circumference = 339.292;
+        const offset = circumference - (totalProb / 100) * circumference;
+        circle.style.strokeDashoffset = offset;
+
+        // Update text
+        document.getElementById('probPercent').textContent = totalProb + '%';
+        document.getElementById('eligScore').textContent = matchScore + '%';
+        document.getElementById('docScore').textContent = docCompleteness + '%';
+
+        // Update tip
+        const tip = document.getElementById('probTip');
+        if (docCompleteness === 100) {
+            tip.innerHTML = '<i class="fas fa-check-circle" style="color:#10b981"></i> All documents verified! Your benefit probability is maximized.';
+            tip.style.background = 'rgba(16,185,129,0.1)';
+            tip.style.borderColor = 'rgba(16,185,129,0.3)';
+            // Show apply button
+            document.getElementById('applySection').style.display = 'block';
+        } else if (docCompleteness > 0) {
+            const remaining = totalDocs - verifiedDocs;
+            tip.innerHTML = `<i class="fas fa-arrow-up" style="color:#f59e0b"></i> Upload ${remaining} more document(s) to increase probability to ${Math.round(eligPart + 40)}%!`;
+        }
+    }
+
+    function showVerifiedToast(docKey) {
+        const info = docLabels[docKey] || { name: docKey };
+        const toast = document.createElement('div');
+        toast.className = 'verified-toast';
+        toast.innerHTML = `<i class="fas fa-check-circle"></i> ${info.name} verified successfully!`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    function simulateApply() {
+        const appId = 'JS-' + Date.now().toString(36).toUpperCase();
+        document.getElementById('appId').textContent = appId;
+        document.getElementById('applySection').style.display = 'none';
+        document.getElementById('appliedSuccess').style.display = 'block';
+        document.getElementById('appliedSuccess').scrollIntoView({ behavior: 'smooth' });
+
+        // Speak success message
+        const msgs = {
+            en: `Congratulations! Your application ${appId} has been submitted successfully.`,
+            hi: `बधाई हो! आपका आवेदन ${appId} सफलतापूर्वक जमा हो गया है।`,
+            kn: `ಅಭಿನಂದನೆಗಳು! ನಿಮ್ಮ ಅರ್ಜಿ ${appId} ಯಶಸ್ವಿಯಾಗಿ ಸಲ್ಲಿಸಲಾಗಿದೆ.`,
+            te: `అభినందనలు! మీ దరఖాస్తు ${appId} విజయవంతంగా సమర్పించబడింది.`,
+            ta: `வாழ்த்துக்கள்! உங்கள் விண்ணப்பம் ${appId} வெற்றிகரமாக சமர்ப்பிக்கப்பட்டது.`,
+        };
+        speakText(msgs[LANG] || msgs.en, LANG);
+    }
+
+    function getCSRF() {
+        const cookies = document.cookie.split(';');
+        for (let c of cookies) { c = c.trim(); if (c.startsWith('csrftoken=')) return c.substring(10); }
+        return '';
+    }
+
+    initPage();
+</script>
+
+<style>
+    /* Prob Dashboard */
+    .prob-dashboard {
+        padding: 24px;
+        margin-bottom: 20px;
+    }
+
+    .prob-dashboard h3 {
+        margin: 0 0 16px;
+        font-size: 16px;
+        color: var(--text-primary);
+    }
+
+    .prob-main {
+        display: flex;
+        align-items: center;
+        gap: 32px;
+        flex-wrap: wrap;
+    }
+
+    .prob-circle {
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .prob-circle svg {
+        transform: scaleX(-1);
+    }
+
+    .prob-circle circle:last-of-type {
+        transition: stroke-dashoffset 1s ease;
+    }
+
+    .prob-percent {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        font-weight: 800;
+        color: var(--text-primary);
+    }
+
+    .prob-breakdown {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .prob-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        font-size: 14px;
+        color: var(--text-secondary);
+    }
+
+    .prob-val {
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .prob-formula-text {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 10px;
+        padding: 8px;
+        background: rgba(59, 130, 246, 0.06);
+        border-radius: 8px;
+    }
+
+    .prob-tip {
+        padding: 10px 14px;
+        margin-top: 16px;
+        border-radius: 10px;
+        font-size: 13px;
+        color: var(--text-secondary);
+        background: rgba(245, 158, 11, 0.08);
+        border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    /* Document Cards */
+    .doc-section {
+        margin-bottom: 24px;
+    }
+
+    .doc-section h3 {
+        font-size: 16px;
+        margin-bottom: 4px;
+    }
+
+    .doc-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        margin-bottom: 10px;
+        border-radius: 14px;
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        transition: all 0.3s;
+    }
+
+    .doc-card:hover {
+        border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .doc-verified {
+        border-color: rgba(16, 185, 129, 0.3);
+        background: rgba(16, 185, 129, 0.04);
+    }
+
+    .doc-uploading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+
+    .doc-card-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex: 1;
+    }
+
+    .doc-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        background: rgba(59, 130, 246, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: var(--primary);
+    }
+
+    .doc-verified .doc-icon {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+
+    .doc-name {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--text-primary);
+    }
+
+    .doc-desc {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+
+    .doc-status {
+        font-size: 12px;
+        margin-top: 4px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    .status-dot.doc-pending {
+        background: #6b7280;
+    }
+
+    .status-dot.doc-uploaded {
+        background: #f59e0b;
+    }
+
+    .status-dot.doc-verified {
+        background: #10b981;
+    }
+
+    .upload-btn {
+        padding: 8px 16px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        background: var(--gradient-primary);
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+    }
+
+    .upload-btn:hover {
+        transform: scale(1.03);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .verified-badge {
+        color: #10b981;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    /* Apply Section */
+    .apply-section {
+        padding: 24px;
+        margin-top: 20px;
+        border: 2px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .apply-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+
+    .apply-info h3 {
+        margin: 0;
+        font-size: 18px;
+    }
+
+    .apply-info p {
+        margin: 4px 0 0;
+        color: var(--text-secondary);
+        font-size: 14px;
+    }
+
+    .apply-btn {
+        white-space: nowrap;
+    }
+
+    /* Applied Success */
+    .applied-success {
+        text-align: center;
+        padding: 40px;
+        margin-top: 20px;
+    }
+
+    .success-icon {
+        font-size: 64px;
+        margin-bottom: 16px;
+    }
+
+    .applied-success h2 {
+        color: #10b981;
+        margin-bottom: 8px;
+    }
+
+    .success-details {
+        margin-top: 20px;
+        display: inline-block;
+        text-align: left;
+    }
+
+    .detail-item {
+        display: flex;
+        gap: 12px;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        font-size: 14px;
+    }
+
+    .detail-item span {
+        color: var(--text-muted);
+        min-width: 140px;
+    }
+
+    /* Verified Toast */
+    .verified-toast {
+        position: fixed;
+        bottom: 32px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: #10b981;
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+        z-index: 10000;
+        box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4);
+        transition: transform 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .verified-toast.show {
+        transform: translateX(-50%) translateY(0);
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,467 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Admin Dashboard — Jan Suvidha Portal{% endblock %}
+{% block body_class %}admin-page{% endblock %}
+
+{% block content %}
+<div class="admin-topbar">
+    <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:24px;">🏛️</span>
+        <h1>Jan Suvidha Admin Dashboard</h1>
+    </div>
+    <div style="display:flex;gap:12px;align-items:center;">
+        <span style="color:var(--text-muted);font-size:14px;"><i class="fas fa-user-shield"></i> Government Admin</span>
+        <a href="{% url 'admin_logout' %}" class="btn btn-outline" style="padding:8px 16px;font-size:13px;">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </div>
+</div>
+
+<div class="admin-content">
+    <!-- Filters -->
+    <div class="filters-bar" id="filtersBar">
+        <div class="filter-group">
+            <label>State</label>
+            <select id="filterState" onchange="onStateChange()">
+                <option value="">All States</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>District</label>
+            <select id="filterDistrict" onchange="onDistrictChange()">
+                <option value="">All Districts</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Village</label>
+            <select id="filterVillage">
+                <option value="">All Villages</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" style="padding:10px 24px;" onclick="loadAnalytics()">
+            <i class="fas fa-filter"></i> Apply Filter
+        </button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid" id="summaryGrid">
+        <div class="summary-card blue">
+            <div class="number" id="totalUsers">—</div>
+            <div class="label">Total Registered Users</div>
+        </div>
+        <div class="summary-card green">
+            <div class="number" id="totalEligible">—</div>
+            <div class="label">Total Eligible (Scheme Matches)</div>
+        </div>
+        <div class="summary-card amber">
+            <div class="number" id="totalApplied">—</div>
+            <div class="label">Actually Applied</div>
+        </div>
+        <div class="summary-card" style="border-top:3px solid #ef4444;">
+            <div class="number" style="color:#ef4444;" id="totalNotApplied">—</div>
+            <div class="label">❗ Eligible but NOT Applied</div>
+        </div>
+        <div class="summary-card purple">
+            <div class="number" id="utilizationRate">—</div>
+            <div class="label">Utilization Rate</div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h3><i class="fas fa-chart-bar" style="color:var(--primary-light);margin-right:8px;"></i> Scheme-wise:
+                Eligible vs Applied</h3>
+            <div class="bar-chart" id="schemeChart"></div>
+        </div>
+        <div class="chart-card">
+            <h3><i class="fas fa-exclamation-triangle" style="color:var(--danger);margin-right:8px;"></i> Critical
+                Villages (Low Utilization)</h3>
+            <div class="critical-list" id="criticalList"></div>
+        </div>
+    </div>
+
+    <!-- Location Stats -->
+    <div class="chart-card mt-3">
+        <h3><i class="fas fa-map-marker-alt" style="color:var(--accent);margin-right:8px;"></i> Location-wise Analytics
+        </h3>
+        <div class="bar-chart" id="locationChart"></div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+         SMS REMINDER SECTION (Fast2SMS Integration)
+         Rule-based, deterministic, NO AI
+         ═══════════════════════════════════════════════════ -->
+    <div class="reminder-section" style="flex-direction:column;gap:16px;margin-top:24px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:12px;">
+            <div>
+                <h3><i class="fas fa-sms" style="color:#3b82f6;margin-right:8px;"></i> SMS Reminder System (Fast2SMS)
+                </h3>
+                <p style="font-size:13px;color:var(--text-muted);margin-top:4px;">
+                    Rule-based reminders to eligible citizens who haven't applied.
+                    <span style="color:var(--secondary);">No AI used — deterministic logic only.</span>
+                </p>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-primary" id="sendAllBtn" onclick="sendReminders('all')"
+                    style="padding:10px 20px;">
+                    <i class="fas fa-paper-plane"></i> Send to All Pending
+                </button>
+                <button class="btn btn-outline" id="sendFilteredBtn" onclick="sendReminders('filtered')"
+                    style="padding:10px 20px;">
+                    <i class="fas fa-filter"></i> Send to Filtered Area
+                </button>
+            </div>
+        </div>
+
+        <!-- SMS Result Panel -->
+        <div id="smsResult" style="display:none;width:100%;"></div>
+
+        <!-- SMS Log Table -->
+        <div style="width:100%;margin-top:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <h4 style="margin:0;font-size:14px;color:var(--text-secondary);"><i class="fas fa-history"></i> Recent
+                    SMS Log</h4>
+                <button class="btn btn-outline" onclick="loadSmsLogs()" style="padding:4px 12px;font-size:12px;">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+            <div id="smsLogTable" style="max-height:200px;overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <!-- Data Flow Explanation Card -->
+    <div class="chart-card mt-3" style="border-left:3px solid var(--primary-light);">
+        <h3><i class="fas fa-project-diagram" style="color:var(--primary-light);margin-right:8px;"></i> SMS Reminder
+            Data Flow</h3>
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.8;">
+            <p><strong>Step 1:</strong> User registers → stored in MongoDB <code>users</code> collection (phone, name,
+                language, village)</p>
+            <p><strong>Step 2:</strong> User answers questions → Rule Engine checks eligibility → stored in
+                <code>applications</code> collection</p>
+            <p><strong>Step 3:</strong> Admin views dashboard → sees Eligible vs Applied per village/scheme</p>
+            <p><strong>Step 4:</strong> Admin clicks "Send Reminders" → queries <code>applications</code> where status =
+                <code>eligible_not_applied</code></p>
+            <p><strong>Step 5:</strong> For each user: get phone from <code>users</code> → send SMS via <strong>Fast2SMS
+                    API</strong> → log in <code>sms_logs</code></p>
+            <p><strong>Step 6:</strong> Mark <code>reminder_sent = true</code> on that application record</p>
+            <p style="margin-top:8px;color:var(--accent);"><i class="fas fa-robot"></i> <strong>No AI is used in this
+                    flow.</strong> It is 100% rule-based and deterministic.</p>
+        </div>
+    </div>
+</div>
+
+<div id="toast-container"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let locationData = {};
+
+    async function loadAnalytics() {
+        const state = document.getElementById('filterState').value;
+        const district = document.getElementById('filterDistrict').value;
+        const village = document.getElementById('filterVillage').value;
+
+        try {
+            const params = new URLSearchParams();
+            if (state) params.set('state', state);
+            if (district) params.set('district', district);
+            if (village) params.set('village', village);
+
+            const resp = await fetch(`/api/admin/analytics/?${params}`);
+            const data = await resp.json();
+
+            if (data.error) { showToast(data.error, 'error'); return; }
+
+            // Summary
+            const s = data.summary;
+            document.getElementById('totalUsers').textContent = s.total_users;
+            document.getElementById('totalEligible').textContent = s.total_eligible;
+            document.getElementById('totalApplied').textContent = s.total_applied;
+            document.getElementById('totalNotApplied').textContent = s.total_not_applied || (s.total_eligible - s.total_applied);
+            document.getElementById('utilizationRate').textContent = s.utilization_rate + '%';
+
+            // Scheme chart
+            renderSchemeChart(data.scheme_stats);
+
+            // Critical villages
+            renderCritical(data.critical_villages);
+
+            // Location chart
+            renderLocationChart(data.location_stats);
+
+            // Populate filters
+            if (data.locations && Object.keys(locationData).length === 0) {
+                locationData = data.locations;
+                populateFilters();
+            }
+        } catch (err) {
+            showToast('Failed to load analytics: ' + err.message, 'error');
+        }
+    }
+
+    function renderSchemeChart(stats) {
+        const container = document.getElementById('schemeChart');
+        if (!stats || stats.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted);padding:20px;">No data available</p>';
+            return;
+        }
+        const maxVal = Math.max(...stats.map(s => s.eligible));
+        container.innerHTML = stats.map(s => {
+            const eligibleW = maxVal > 0 ? (s.eligible / maxVal * 100) : 0;
+            const appliedW = maxVal > 0 ? (s.applied / maxVal * 100) : 0;
+            const notApplied = s.eligible - s.applied;
+            return `<div class="bar-row">
+            <div class="bar-label" title="${s.name}">${s.name.length > 18 ? s.name.substring(0, 18) + '...' : s.name}</div>
+            <div class="bar-track">
+                <div class="bar-eligible" style="width:${eligibleW}%"></div>
+                <div class="bar-applied" style="width:${appliedW}%"></div>
+                <div class="bar-value">${s.applied}/${s.eligible} (Gap: ${notApplied})</div>
+            </div>
+        </div>`;
+        }).join('');
+        container.innerHTML += `<div style="display:flex;gap:16px;margin-top:12px;font-size:12px;color:var(--text-muted);">
+        <span><span style="display:inline-block;width:12px;height:12px;background:rgba(59,130,246,0.3);border-radius:2px;margin-right:4px;"></span>Eligible</span>
+        <span><span style="display:inline-block;width:12px;height:12px;background:var(--accent);border-radius:2px;margin-right:4px;"></span>Applied</span>
+        <span><span style="display:inline-block;width:12px;height:12px;background:rgba(239,68,68,0.3);border-radius:2px;margin-right:4px;"></span>Gap (Not Applied)</span>
+    </div>`;
+    }
+
+    function renderCritical(villages) {
+        const container = document.getElementById('criticalList');
+        if (!villages || villages.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted);padding:20px;">✅ No critical villages found</p>';
+            return;
+        }
+        container.innerHTML = villages.map(v => {
+            const notApplied = v.eligible - v.applied;
+            return `<div class="critical-item">
+            <div>
+                <div class="village-name">${v.village}, ${v.district}</div>
+                <div class="village-stats">Eligible: ${v.eligible} | Applied: ${v.applied} | <strong style="color:var(--danger);">Not Applied: ${notApplied}</strong> | Rate: ${v.utilization_rate}%</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <span class="critical-badge"><i class="fas fa-exclamation-triangle"></i> Critical</span>
+                <button class="btn btn-outline" style="padding:4px 10px;font-size:11px;" onclick="sendRemindersForVillage('${v.village}','${v.district}','${v.state}')">
+                    <i class="fas fa-sms"></i> SMS
+                </button>
+            </div>
+        </div>`;
+        }).join('');
+    }
+
+    function renderLocationChart(stats) {
+        const container = document.getElementById('locationChart');
+        if (!stats || stats.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted);padding:20px;">No location data</p>';
+            return;
+        }
+        const maxVal = Math.max(...stats.map(s => s.eligible));
+        container.innerHTML = stats.map(s => {
+            const eligibleW = maxVal > 0 ? (s.eligible / maxVal * 100) : 0;
+            const appliedW = maxVal > 0 ? (s.applied / maxVal * 100) : 0;
+            const badge = s.is_critical ? ' <span class="critical-badge" style="font-size:10px;padding:2px 8px;">⚠️</span>' : '';
+            return `<div class="bar-row">
+            <div class="bar-label">${s.village}${badge}</div>
+            <div class="bar-track">
+                <div class="bar-eligible" style="width:${eligibleW}%"></div>
+                <div class="bar-applied" style="width:${appliedW}%"></div>
+                <div class="bar-value">${s.utilization_rate || 0}%</div>
+            </div>
+        </div>`;
+        }).join('');
+    }
+
+    function populateFilters() {
+        const stateSelect = document.getElementById('filterState');
+        Object.keys(locationData).forEach(state => {
+            const opt = document.createElement('option');
+            opt.value = state; opt.textContent = state;
+            stateSelect.appendChild(opt);
+        });
+    }
+
+    function onStateChange() {
+        const state = document.getElementById('filterState').value;
+        const distSelect = document.getElementById('filterDistrict');
+        const vilSelect = document.getElementById('filterVillage');
+        distSelect.innerHTML = '<option value="">All Districts</option>';
+        vilSelect.innerHTML = '<option value="">All Villages</option>';
+        if (state && locationData[state]) {
+            Object.keys(locationData[state]).forEach(d => {
+                const opt = document.createElement('option');
+                opt.value = d; opt.textContent = d;
+                distSelect.appendChild(opt);
+            });
+        }
+    }
+
+    function onDistrictChange() {
+        const state = document.getElementById('filterState').value;
+        const district = document.getElementById('filterDistrict').value;
+        const vilSelect = document.getElementById('filterVillage');
+        vilSelect.innerHTML = '<option value="">All Villages</option>';
+        if (state && district && locationData[state] && locationData[state][district]) {
+            locationData[state][district].forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v; opt.textContent = v;
+                vilSelect.appendChild(opt);
+            });
+        }
+    }
+
+    // ─── SMS Reminder Functions ───
+
+    async function sendReminders(target) {
+        const btn = target === 'all' ? document.getElementById('sendAllBtn') : document.getElementById('sendFilteredBtn');
+        const origHTML = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px;"></div> Sending...';
+
+        const payload = { target };
+        if (target === 'filtered') {
+            payload.village = document.getElementById('filterVillage').value;
+            payload.district = document.getElementById('filterDistrict').value;
+            payload.state = document.getElementById('filterState').value;
+        }
+
+        try {
+            const resp = await fetch('/api/admin/send-reminder/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+
+            if (data.success) {
+                showSmsResult(data);
+                showToast(data.message, 'success');
+                loadSmsLogs();
+            } else {
+                showToast(data.error || 'Failed', 'error');
+            }
+        } catch (err) {
+            showToast('Connection error: ' + err.message, 'error');
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = origHTML;
+    }
+
+    function sendRemindersForVillage(village, district, state) {
+        if (!confirm(`Send SMS reminders to all eligible citizens in ${village}, ${district}?`)) return;
+
+        fetch('/api/admin/send-reminder/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+            body: JSON.stringify({ target: 'filtered', village, district, state })
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    showSmsResult(data);
+                    loadSmsLogs();
+                } else {
+                    showToast(data.error || 'Failed', 'error');
+                }
+            })
+            .catch(err => showToast('Error: ' + err.message, 'error'));
+    }
+
+    function showSmsResult(data) {
+        const panel = document.getElementById('smsResult');
+        panel.style.display = 'block';
+        panel.innerHTML = `
+            <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:12px;padding:16px;">
+                <h4 style="margin:0 0 10px;color:var(--accent);"><i class="fas fa-check-circle"></i> SMS Reminder Results</h4>
+                <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:14px;">
+                    <div><strong>${data.total_users}</strong> <span style="color:var(--text-muted);">Users Targeted</span></div>
+                    <div><strong style="color:#10b981;">${data.sms_sent || 0}</strong> <span style="color:var(--text-muted);">SMS Sent</span></div>
+                    <div><strong style="color:#f59e0b;">${data.sms_simulated || 0}</strong> <span style="color:var(--text-muted);">Simulated</span></div>
+                    <div><strong style="color:#ef4444;">${data.sms_failed || 0}</strong> <span style="color:var(--text-muted);">Failed</span></div>
+                </div>
+                ${data.sms_simulated > 0 ? '<p style="margin-top:8px;font-size:12px;color:var(--secondary);">⚠️ Simulated — set FAST2SMS_API_KEY in .env to send real SMS</p>' : ''}
+                ${data.details && data.details.length > 0 ? `
+                <div style="margin-top:12px;max-height:120px;overflow-y:auto;">
+                    <table style="width:100%;font-size:12px;border-collapse:collapse;">
+                        <tr style="color:var(--text-muted);text-align:left;">
+                            <th style="padding:4px 8px;">Name</th>
+                            <th style="padding:4px 8px;">Phone</th>
+                            <th style="padding:4px 8px;">Village</th>
+                            <th style="padding:4px 8px;">Schemes</th>
+                            <th style="padding:4px 8px;">Status</th>
+                        </tr>
+                        ${data.details.map(d => `
+                        <tr style="border-top:1px solid var(--border-color);">
+                            <td style="padding:4px 8px;">${d.name}</td>
+                            <td style="padding:4px 8px;">${d.phone}</td>
+                            <td style="padding:4px 8px;">${d.village}</td>
+                            <td style="padding:4px 8px;">${d.schemes}</td>
+                            <td style="padding:4px 8px;"><span style="color:${d.status === 'sent' ? '#10b981' : '#ef4444'}">${d.status}</span></td>
+                        </tr>`).join('')}
+                    </table>
+                </div>` : ''}
+            </div>`;
+    }
+
+    async function loadSmsLogs() {
+        try {
+            const resp = await fetch('/api/admin/sms-logs/');
+            const data = await resp.json();
+            const container = document.getElementById('smsLogTable');
+
+            if (!data.logs || data.logs.length === 0) {
+                container.innerHTML = '<p style="color:var(--text-muted);font-size:13px;padding:8px;">No SMS logs yet.</p>';
+                return;
+            }
+
+            container.innerHTML = `
+            <table style="width:100%;font-size:12px;border-collapse:collapse;">
+                <tr style="color:var(--text-muted);text-align:left;position:sticky;top:0;background:var(--card-bg);">
+                    <th style="padding:6px 8px;">Time</th>
+                    <th style="padding:6px 8px;">Phone</th>
+                    <th style="padding:6px 8px;">Status</th>
+                    <th style="padding:6px 8px;">Message</th>
+                </tr>
+                ${data.logs.map(log => {
+                const statusColor = { sent: '#10b981', simulated: '#f59e0b', failed: '#ef4444', api_error: '#ef4444' }[log.status] || '#94a3b8';
+                const time = new Date(log.timestamp).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
+                return `<tr style="border-top:1px solid var(--border-color);">
+                        <td style="padding:4px 8px;color:var(--text-muted);">${time}</td>
+                        <td style="padding:4px 8px;">***${log.phone.slice(-4)}</td>
+                        <td style="padding:4px 8px;"><span style="color:${statusColor};font-weight:600;">${log.status}</span></td>
+                        <td style="padding:4px 8px;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${log.message || '—'}</td>
+                    </tr>`;
+            }).join('')}
+            </table>`;
+        } catch (err) {
+            document.getElementById('smsLogTable').innerHTML = '<p style="color:var(--danger);font-size:12px;">Failed to load logs</p>';
+        }
+    }
+
+    function showToast(msg, type) {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        const icon = type === 'success' ? 'fa-check-circle' : 'fa-times-circle';
+        const color = type === 'success' ? 'var(--accent)' : 'var(--danger)';
+        toast.innerHTML = `<i class="fas ${icon}" style="color:${color};font-size:18px;"></i><span>${msg}</span>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+
+    function getCSRF() {
+        const cookies = document.cookie.split(';');
+        for (let c of cookies) {
+            c = c.trim();
+            if (c.startsWith('csrftoken=')) return c.substring(10);
+        }
+        return '';
+    }
+
+    // Load on page load
+    loadAnalytics();
+    loadSmsLogs();
+</script>
+{% endblock %}

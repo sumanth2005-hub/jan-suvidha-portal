@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Jan Suvidha Portal — Every Scheme, Every Citizen, Every Language{% endblock %}
+{% block body_class %}landing-page{% endblock %}
+
+{% block content %}
+<!-- Navbar -->
+<nav class="navbar" id="navbar">
+    <div class="navbar-brand">
+        <div class="icon">🏛️</div>
+        <span>Jan Suvidha</span>
+    </div>
+    <div class="navbar-links">
+        <button class="lang-btn active" data-lang="en">English</button>
+        <button class="lang-btn" data-lang="hi">हिन्दी</button>
+        <button class="lang-btn" data-lang="kn">ಕನ್ನಡ</button>
+        <button class="lang-btn" data-lang="te">తెలుగు</button>
+        <button class="lang-btn" data-lang="ta">தமிழ்</button>
+        <a href="{% url 'admin_login' %}" class="btn btn-outline"
+            style="margin-left: 12px; padding: 8px 20px; font-size: 13px;">
+            <i class="fas fa-lock"></i> Admin
+        </a>
+    </div>
+</nav>
+
+<!-- Hero Section -->
+<section class="hero" id="hero">
+    <div class="hero-wrapper">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <i class="fas fa-bolt"></i>
+                <span data-i18n="hero_badge">AI-Powered Scheme Discovery</span>
+            </div>
+            <h1>
+                <span data-i18n="hero_title_1">Government Schemes,</span><br>
+                <span class="highlight" data-i18n="hero_title_2">Simplified for You</span>
+            </h1>
+            <p data-i18n="hero_desc">
+                Don't miss the benefits you deserve. Answer a few simple questions — in your language — and discover
+                every government scheme you're eligible for.
+            </p>
+            <div class="hero-actions">
+                <a href="{% url 'register' %}" class="btn btn-primary btn-lg" id="startBtn">
+                    <i class="fas fa-arrow-right"></i>
+                    <span data-i18n="hero_cta">Find My Schemes</span>
+                </a>
+                <a href="#features" class="btn btn-outline btn-lg">
+                    <i class="fas fa-info-circle"></i>
+                    <span data-i18n="hero_learn">How It Works</span>
+                </a>
+            </div>
+            <div class="hero-stats">
+                <div class="stat-item">
+                    <div class="stat-number" id="schemeCount">15+</div>
+                    <div class="stat-label" data-i18n="stat_schemes">Welfare Schemes</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">5</div>
+                    <div class="stat-label" data-i18n="stat_langs">Languages</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label" data-i18n="stat_free">Free & Accessible</div>
+                </div>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <!-- Animated illustration placeholder -->
+            <div
+                style="width: 320px; height: 320px; border-radius: 50%; background: radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%); display: flex; align-items: center; justify-content: center; font-size: 120px; animation: float 3s ease-in-out infinite;">
+                🏛️
+            </div>
+        </div>
+    </div>
+</section>
+
+<style>
+    @keyframes float {
+
+        0%,
+        100% {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-15px);
+        }
+    }
+</style>
+
+<!-- Language Selection -->
+<section class="lang-section" id="languages">
+    <h2 data-i18n="lang_title">Choose Your Language</h2>
+    <p data-i18n="lang_desc">We speak your language. Select one to get started.</p>
+    <div class="lang-cards">
+        <div class="lang-card" data-lang="en" onclick="selectLanguage('en')">
+            <div class="lang-icon">🇬🇧</div>
+            <h3>English</h3>
+            <p>Continue in English</p>
+        </div>
+        <div class="lang-card" data-lang="hi" onclick="selectLanguage('hi')">
+            <div class="lang-icon">🇮🇳</div>
+            <h3>हिन्दी</h3>
+            <p>हिन्दी में जारी रखें</p>
+        </div>
+        <div class="lang-card" data-lang="kn" onclick="selectLanguage('kn')">
+            <div class="lang-icon">🏛️</div>
+            <h3>ಕನ್ನಡ</h3>
+            <p>ಕನ್ನಡದಲ್ಲಿ ಮುಂದುವರಿಸಿ</p>
+        </div>
+        <div class="lang-card" data-lang="te" onclick="selectLanguage('te')">
+            <div class="lang-icon">🌾</div>
+            <h3>తెలుగు</h3>
+            <p>తెలుగులో కొనసాగించండి</p>
+        </div>
+        <div class="lang-card" data-lang="ta" onclick="selectLanguage('ta')">
+            <div class="lang-icon">🏯</div>
+            <h3>தமிழ்</h3>
+            <p>தமிழில் தொடரவும்</p>
+        </div>
+    </div>
+</section>
+
+<!-- Features -->
+<section class="features" id="features">
+    <h2 data-i18n="features_title">How Jan Suvidha Helps You</h2>
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon blue"><i class="fas fa-robot"></i></div>
+            <h3 data-i18n="f1_title">AI-Powered Questions</h3>
+            <p data-i18n="f1_desc">Simple Yes/No questions powered by AI that understand your situation and find
+                matching schemes automatically.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon green"><i class="fas fa-language"></i></div>
+            <h3 data-i18n="f2_title">Multilingual Support</h3>
+            <p data-i18n="f2_desc">Use the portal in English, Hindi, or Kannada. Every question and scheme description
+                in your language.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon amber"><i class="fas fa-volume-up"></i></div>
+            <h3 data-i18n="f3_title">Voice Assistant</h3>
+            <p data-i18n="f3_desc">Can't read? No problem. Our voice assistant reads every question aloud and guides you
+                through the process.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon purple"><i class="fas fa-file-check"></i></div>
+            <h3 data-i18n="f4_title">Document Verification</h3>
+            <p data-i18n="f4_desc">Upload your documents and instantly see your benefit probability. Know exactly what
+                you need before applying.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon blue"><i class="fas fa-chart-line"></i></div>
+            <h3 data-i18n="f5_title">Benefit Prediction</h3>
+            <p data-i18n="f5_desc">Get a clear percentage showing your chance of receiving benefits based on eligibility
+                and document completeness.</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon green"><i class="fab fa-whatsapp"></i></div>
+            <h3 data-i18n="f6_title">WhatsApp Reminders</h3>
+            <p data-i18n="f6_desc">Opted in? We'll remind you on WhatsApp about schemes you haven't applied for yet, so
+                you never miss a deadline.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+    <div class="disclaimer">
+        ⚠️ <strong>Academic Prototype</strong> — This portal uses dummy data only. No real government data, Aadhaar
+        verification, or official beneficiary information is used. Built for hackathon/academic purposes.
+    </div>
+    <p>© 2026 Jan Suvidha Portal | Built with ❤️ for India's rural citizens</p>
+</footer>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const translations = {
+        en: {
+            hero_badge: "AI-Powered Scheme Discovery",
+            hero_title_1: "Government Schemes,",
+            hero_title_2: "Simplified for You",
+            hero_desc: "Don't miss the benefits you deserve. Answer a few simple questions — in your language — and discover every government scheme you're eligible for.",
+            hero_cta: "Find My Schemes",
+            hero_learn: "How It Works",
+            stat_schemes: "Welfare Schemes",
+            stat_langs: "Languages",
+            stat_free: "Free & Accessible",
+            lang_title: "Choose Your Language",
+            lang_desc: "We speak your language. Select one to get started.",
+            features_title: "How Jan Suvidha Helps You",
+            f1_title: "AI-Powered Questions", f1_desc: "Simple Yes/No questions powered by AI that understand your situation and find matching schemes automatically.",
+            f2_title: "Multilingual Support", f2_desc: "Use the portal in English, Hindi, or Kannada. Every question and scheme description in your language.",
+            f3_title: "Voice Assistant", f3_desc: "Can't read? No problem. Our voice assistant reads every question aloud and guides you through the process.",
+            f4_title: "Document Verification", f4_desc: "Upload your documents and instantly see your benefit probability.",
+            f5_title: "Benefit Prediction", f5_desc: "Get a clear percentage showing your chance of receiving benefits.",
+            f6_title: "WhatsApp Reminders", f6_desc: "We'll remind you about schemes you haven't applied for yet.",
+        },
+        hi: {
+            hero_badge: "AI-संचालित योजना खोज",
+            hero_title_1: "सरकारी योजनाएं,",
+            hero_title_2: "आपके लिए सरल",
+            hero_desc: "आप जिन लाभों के हकदार हैं, उन्हें न चूकें। कुछ सरल प्रश्नों का उत्तर दें — अपनी भाषा में — और पात्र सरकारी योजनाओं की खोज करें।",
+            hero_cta: "मेरी योजनाएं खोजें",
+            hero_learn: "कैसे काम करता है",
+            stat_schemes: "कल्याण योजनाएं",
+            stat_langs: "भाषाएं",
+            stat_free: "मुफ्त और सुलभ",
+            lang_title: "अपनी भाषा चुनें",
+            lang_desc: "हम आपकी भाषा बोलते हैं।",
+            features_title: "जन सुविधा कैसे मदद करता है",
+            f1_title: "AI-संचालित प्रश्न", f1_desc: "AI द्वारा संचालित सरल हां/नहीं प्रश्न जो आपकी स्थिति को समझते हैं।",
+            f2_title: "बहुभाषी सहायता", f2_desc: "पोर्टल का उपयोग अंग्रेजी, हिंदी या कन्नड़ में करें।",
+            f3_title: "वॉइस असिस्टेंट", f3_desc: "पढ़ नहीं सकते? हमारा वॉइस असिस्टेंट हर प्रश्न पढ़कर सुनाता है।",
+            f4_title: "दस्तावेज़ सत्यापन", f4_desc: "अपने दस्तावेज़ अपलोड करें और तुरंत लाभ की संभावना देखें।",
+            f5_title: "लाभ भविष्यवाणी", f5_desc: "लाभ प्राप्त करने की संभावना प्रतिशत में देखें।",
+            f6_title: "व्हाट्सएप रिमाइंडर", f6_desc: "हम आपको उन योजनाओं की याद दिलाएंगे जिनके लिए आपने आवेदन नहीं किया।",
+        },
+        kn: {
+            hero_badge: "AI-ಚಾಲಿತ ಯೋಜನೆ ಅನ್ವೇಷಣೆ",
+            hero_title_1: "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು,",
+            hero_title_2: "ನಿಮಗಾಗಿ ಸರಳ",
+            hero_desc: "ನೀವು ಅರ್ಹರಾಗಿರುವ ಲಾಭಗಳನ್ನು ಕಳೆದುಕೊಳ್ಳಬೇಡಿ. ಕೆಲವು ಸರಳ ಪ್ರಶ್ನೆಗಳಿಗೆ ಉತ್ತರಿಸಿ — ನಿಮ್ಮ ಭಾಷೆಯಲ್ಲಿ.",
+            hero_cta: "ನನ್ನ ಯೋಜನೆಗಳನ್ನು ಹುಡುಕಿ",
+            hero_learn: "ಹೇಗೆ ಕೆಲಸ ಮಾಡುತ್ತದೆ",
+            stat_schemes: "ಕಲ್ಯಾಣ ಯೋಜನೆಗಳು",
+            stat_langs: "ಭಾಷೆಗಳು",
+            stat_free: "ಉಚಿತ ಮತ್ತು ಪ್ರವೇಶಿಸಬಹುದು",
+            lang_title: "ನಿಮ್ಮ ಭಾಷೆ ಆಯ್ಕೆ ಮಾಡಿ",
+            lang_desc: "ನಾವು ನಿಮ್ಮ ಭಾಷೆ ಮಾತನಾಡುತ್ತೇವೆ.",
+            features_title: "ಜನ ಸುವಿಧಾ ಹೇಗೆ ಸಹಾಯ ಮಾಡುತ್ತದೆ",
+            f1_title: "AI-ಚಾಲಿತ ಪ್ರಶ್ನೆಗಳು", f1_desc: "ನಿಮ್ಮ ಪರಿಸ್ಥಿತಿಯನ್ನು ಅರ್ಥಮಾಡಿಕೊಳ್ಳುವ ಸರಳ ಪ್ರಶ್ನೆಗಳು.",
+            f2_title: "ಬಹುಭಾಷಾ ಬೆಂಬಲ", f2_desc: "ಇಂಗ್ಲಿಷ್, ಹಿಂದಿ ಅಥವಾ ಕನ್ನಡದಲ್ಲಿ ಬಳಸಿ.",
+            f3_title: "ವಾಯ್ಸ್ ಅಸಿಸ್ಟೆಂಟ್", f3_desc: "ಓದಲು ಸಾಧ್ಯವಿಲ್ಲವೇ? ನಮ್ಮ ವಾಯ್ಸ್ ಅಸಿಸ್ಟೆಂಟ್ ಪ್ರತಿ ಪ್ರಶ್ನೆಯನ್ನು ಓದುತ್ತದೆ.",
+            f4_title: "ದಾಖಲೆ ಪರಿಶೀಲನೆ", f4_desc: "ನಿಮ್ಮ ದಾಖಲೆಗಳನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ.",
+            f5_title: "ಲಾಭ ಊಹೆ", f5_desc: "ಲಾಭ ಪಡೆಯುವ ಸಾಧ್ಯತೆ ಶೇಕಡಾವಾರು ನೋಡಿ.",
+            f6_title: "WhatsApp ಜ್ಞಾಪನೆಗಳು", f6_desc: "ನೀವು ಅರ್ಜಿ ಸಲ್ಲಿಸದ ಯೋಜನೆಗಳ ಬಗ್ಗೆ ನೆನಪಿಸುತ್ತೇವೆ.",
+        },
+        te: {
+            hero_badge: "AI-ఆధారిత పథకాల అన్వేషణ",
+            hero_title_1: "ప్రభుత్వ పథకాలు,",
+            hero_title_2: "మీ కోసం సరళంగా",
+            hero_desc: "మీకు అర్హమైన ప్రయోజనాలను కోల్పోకండి. కొన్ని సరళమైన ప్రశ్నలకు సమాధానం ఇవ్వండి — మీ భాషలో.",
+            hero_cta: "నా పథకాలను కనుగొనండి",
+            hero_learn: "ఎలా పని చేస్తుంది",
+            stat_schemes: "సంక్షేమ పథకాలు",
+            stat_langs: "భాషలు",
+            stat_free: "ఉచితం & అందుబాటులో",
+            lang_title: "మీ భాషను ఎంచుకోండి",
+            lang_desc: "మేము మీ భాష మాట్లాడతాము.",
+            features_title: "జన సువిధా ఎలా సహాయం చేస్తుంది",
+            f1_title: "AI-ఆధారిత ప్రశ్నలు", f1_desc: "మీ పరిస్థితిని అర్థం చేసుకునే సరళమైన ప్రశ్నలు.",
+            f2_title: "బహుభాషా మద్దతు", f2_desc: "ఇంగ్లీష్, హిందీ, కన్నడ, తెలుగు లేదా తమిళంలో వాడండి.",
+            f3_title: "వాయిస్ అసిస్టెంట్", f3_desc: "చదవలేరా? మా వాయిస్ అసిస్టెంట్ ప్రతి ప్రశ్నను చదివి వినిపిస్తుంది.",
+            f4_title: "పత్ర ధృవీకరణ", f4_desc: "మీ పత్రాలను అప్‌లోడ్ చేయండి.",
+            f5_title: "ప్రయోజన అంచనా", f5_desc: "ప్రయోజనాలు పొందే అవకాశం శాతంలో చూడండి.",
+            f6_title: "WhatsApp రిమైండర్లు", f6_desc: "మీరు దరఖాస్తు చేయని పథకాల గురించి గుర్తు చేస్తాము.",
+        },
+        ta: {
+            hero_badge: "AI-இயங்கும் திட்ட கண்டுபிடிப்பு",
+            hero_title_1: "அரசு திட்டங்கள்,",
+            hero_title_2: "உங்களுக்காக எளிமையாக",
+            hero_desc: "உங்களுக்கு உரிய நன்மைகளை இழக்காதீர்கள். சில எளிய கேள்விகளுக்கு பதிலளியுங்கள் — உங்கள் மொழியில்.",
+            hero_cta: "எனது திட்டங்களைக் கண்டுபிடி",
+            hero_learn: "எவ்வாறு செயல்படுகிறது",
+            stat_schemes: "நல திட்டங்கள்",
+            stat_langs: "மொழிகள்",
+            stat_free: "இலவசம் & அணுகக்கூடியது",
+            lang_title: "உங்கள் மொழியைத் தேர்ந்தெடுங்கள்",
+            lang_desc: "நாங்கள் உங்கள் மொழி பேசுகிறோம்.",
+            features_title: "ஜன சுவிதா எவ்வாறு உதவுகிறது",
+            f1_title: "AI-இயங்கும் கேள்விகள்", f1_desc: "உங்கள் நிலையை புரிந்துகொள்ளும் எளிய கேள்விகள்.",
+            f2_title: "பல மொழி ஆதரவு", f2_desc: "ஆங்கிலம், இந்தி, கன்னடம், தெலுங்கு அல்லது தமிழில் பயன்படுத்துங்கள்.",
+            f3_title: "குரல் உதவியாளர்", f3_desc: "படிக்க முடியவில்லையா? எங்கள் குரல் உதவியாளர் ஒவ்வொரு கேள்வியையும் படிக்கும்.",
+            f4_title: "ஆவண சரிபார்ப்பு", f4_desc: "உங்கள் ஆவணங்களைப் பதிவேற்றுங்கள்.",
+            f5_title: "பயன் கணிப்பு", f5_desc: "நன்மைகள் பெறுவதற்கான வாய்ப்பை சதவீதமாகப் பாருங்கள்.",
+            f6_title: "WhatsApp நினைவூட்டல்கள்", f6_desc: "நீங்கள் விண்ணப்பிக்காத திட்டங்களை நினைவூட்டுவோம்.",
+        }
+    };
+
+    let currentLang = 'en';
+
+    function setLanguage(lang) {
+        currentLang = lang;
+        localStorage.setItem('janSuvidhaLang', lang);
+        document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+        const t = translations[lang] || translations.en;
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.dataset.i18n;
+            if (t[key]) el.textContent = t[key];
+        });
+    }
+
+    function selectLanguage(lang) {
+        setLanguage(lang);
+        window.location.href = `/register/?lang=${lang}`;
+    }
+
+    // Navbar lang buttons
+    document.querySelectorAll('.navbar .lang-btn').forEach(btn => {
+        btn.addEventListener('click', () => setLanguage(btn.dataset.lang));
+    });
+
+    // Restore language
+    const saved = localStorage.getItem('janSuvidhaLang');
+    if (saved) setLanguage(saved);
+</script>
+{% endblock %}

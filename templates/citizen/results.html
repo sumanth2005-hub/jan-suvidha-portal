@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Your Eligible Schemes — Jan Suvidha Portal{% endblock %}
+{% block body_class %}results-page{% endblock %}
+
+{% block content %}
+<div class="container">
+    <nav class="navbar" style="position:relative;margin-bottom:24px;">
+        <div class="navbar-brand">
+            <div class="icon">🏛️</div><span>Jan Suvidha</span>
+        </div>
+        <div class="navbar-links">
+            <a href="/" class="btn btn-outline" style="padding:8px 20px;font-size:13px;" id="homeBtn">
+                <i class="fas fa-home"></i> <span id="homeLbl">Home</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="results-header" id="resultsHeader">
+        <h1 id="resultsTitle">🎉 Your Eligible Schemes</h1>
+        <p id="resultsSubtitle">Based on your answers, here are the schemes you qualify for</p>
+        <div class="results-count" id="resultsCount">
+            <i class="fas fa-check-circle"></i>
+            <span id="loadingLbl">Loading...</span>
+        </div>
+    </div>
+
+    <div class="scheme-cards" id="schemeCards">
+        <div class="text-center mt-4">
+            <div class="spinner" style="margin:0 auto;"></div>
+            <p class="mt-2" style="color:var(--text-muted);" id="loadingResultsLbl">Loading your results...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/voice.js' %}"></script>
+<script>
+    const LANG = '{{ lang }}';
+    const sessionSchemes = {{ schemes_json| safe }};
+
+    // ──── Full Translation Dictionary ────
+    const R = {
+        en: {
+            home: 'Home',
+            title: '🎉 Your Eligible Schemes',
+            subtitle: 'Based on your answers, here are the schemes you qualify for',
+            loading: 'Loading...',
+            loadingResults: 'Loading your results...',
+            schemesFound: n => `${n} Scheme(s) Found`,
+            noSchemesTitle: 'No schemes found',
+            noSchemesDesc: 'Try updating your answers for better results.',
+            tryAgain: 'Try Again',
+            noResults: 'No results found',
+            completeFirst: 'Please complete the questionnaire first.',
+            startQuestionnaire: 'Start Questionnaire',
+            benefit: 'Benefit',
+            lastDate: 'Last Date',
+            requiredDocs: n => `Required Documents (${n})`,
+            chanceOfBenefit: '🎯 Chance of Getting Benefit',
+            eligibility: 'Eligibility',
+            documents: 'Documents',
+            uploadHint: '⬆️ Upload documents to increase your benefit probability!',
+            uploadBtn: 'Upload Documents & Verify',
+            readAloud: 'Read Aloud',
+            fullMatch: '✅ Full Match',
+            partialMatch: '⚠️ Partial Match',
+            zeroSchemes: '0 Schemes',
+            benefitAudio: (name, desc, amt) => `${name}. ${desc}. Benefit amount: ${amt}.`,
+        },
+        hi: {
+            home: 'होम',
+            title: '🎉 आपकी पात्र योजनाएं',
+            subtitle: 'आपके उत्तरों के आधार पर, ये योजनाएं आपके लिए हैं',
+            loading: 'लोड हो रहा है...',
+            loadingResults: 'परिणाम लोड हो रहे हैं...',
+            schemesFound: n => `${n} योजना(एं) मिलीं`,
+            noSchemesTitle: 'कोई योजना नहीं मिली',
+            noSchemesDesc: 'बेहतर परिणामों के लिए अपने उत्तर अपडेट करें।',
+            tryAgain: 'फिर कोशिश करें',
+            noResults: 'कोई परिणाम नहीं',
+            completeFirst: 'कृपया पहले प्रश्नावली पूरी करें।',
+            startQuestionnaire: 'प्रश्नावली शुरू करें',
+            benefit: 'लाभ',
+            lastDate: 'अंतिम तिथि',
+            requiredDocs: n => `आवश्यक दस्तावेज (${n})`,
+            chanceOfBenefit: '🎯 लाभ मिलने की संभावना',
+            eligibility: 'पात्रता',
+            documents: 'दस्तावेज',
+            uploadHint: '⬆️ दस्तावेज अपलोड कर लाभ की संभावना बढ़ाएं!',
+            uploadBtn: 'दस्तावेज अपलोड करें & सत्यापित करें',
+            readAloud: 'जोर से पढ़ें',
+            fullMatch: '✅ पूर्ण मिलान',
+            partialMatch: '⚠️ आंशिक मिलान',
+            zeroSchemes: '0 योजनाएं',
+            benefitAudio: (name, desc, amt) => `${name}. ${desc}. लाभ राशि: ${amt}.`,
+        },
+        kn: {
+            home: 'ಮುಖ್ಯ',
+            title: '🎉 ನಿಮ್ಮ ಅರ್ಹ ಯೋಜನೆಗಳು',
+            subtitle: 'ನಿಮ್ಮ ಉತ್ತರಗಳ ಆಧಾರದ ಮೇಲೆ ಈ ಯೋಜನೆಗಳು ನಿಮಗೆ ಅರ್ಹ',
+            loading: 'ಲೋಡ್ ಆಗುತ್ತಿದೆ...',
+            loadingResults: 'ಫಲಿತಾಂಶಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ...',
+            schemesFound: n => `${n} ಯೋಜನೆ(ಗಳು) ಕಂಡುಬಂದವು`,
+            noSchemesTitle: 'ಯೋಜನೆಗಳು ಸಿಗಲಿಲ್ಲ',
+            noSchemesDesc: 'ಉತ್ತಮ ಫಲಿತಾಂಶಕ್ಕಾಗಿ ನಿಮ್ಮ ಉತ್ತರಗಳನ್ನು ಅಪ್ಡೇಟ್ ಮಾಡಿ.',
+            tryAgain: 'ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ',
+            noResults: 'ಫಲಿತಾಂಶಗಳಿಲ್ಲ',
+            completeFirst: 'ದಯವಿಟ್ಟು ಮೊದಲು ಪ್ರಶ್ನಾವಳಿ ಪೂರ್ಣಗೊಳಿಸಿ.',
+            startQuestionnaire: 'ಪ್ರಶ್ನಾವಳಿ ಪ್ರಾರಂಭಿಸಿ',
+            benefit: 'ಲಾಭ',
+            lastDate: 'ಅಂತಿಮ ದಿನಾಂಕ',
+            requiredDocs: n => `ಅಗತ್ಯ ದಾಖಲೆಗಳು (${n})`,
+            chanceOfBenefit: '🎯 ಲಾಭ ಸಿಗುವ ಸಾಧ್ಯತೆ',
+            eligibility: 'ಅರ್ಹತೆ',
+            documents: 'ದಾಖಲೆಗಳು',
+            uploadHint: '⬆️ ದಾಖಲೆಗಳನ್ನು ಅಪ್ಲೋಡ್ ಮಾಡಿ ಲಾಭದ ಸಾಧ್ಯತೆ ಹೆಚ್ಚಿಸಿ!',
+            uploadBtn: 'ದಾಖಲೆಗಳನ್ನು ಅಪ್ಲೋಡ್ ಮಾಡಿ & ಪರಿಶೀಲಿಸಿ',
+            readAloud: 'ಜೋರಾಗಿ ಓದಿ',
+            fullMatch: '✅ ಸಂಪೂರ್ಣ ಹೊಂದಾಣಿಕೆ',
+            partialMatch: '⚠️ ಭಾಗಶಃ ಹೊಂದಾಣಿಕೆ',
+            zeroSchemes: '0 ಯೋಜನೆಗಳು',
+            benefitAudio: (name, desc, amt) => `${name}. ${desc}. ಲಾಭದ ಮೊತ್ತ: ${amt}.`,
+        },
+        te: {
+            home: 'హోమ్',
+            title: '🎉 మీ అర్హమైన పథకాలు',
+            subtitle: 'మీ సమాధానాల ఆధారంగా, ఈ పథకాలు మీకు అర్హమైనవి',
+            loading: 'లోడ్ అవుతోంది...',
+            loadingResults: 'ఫలితాలు లోడ్ అవుతున్నాయి...',
+            schemesFound: n => `${n} పథకం(అలు) కనుగొనబడ్డాయి`,
+            noSchemesTitle: 'పథకాలు కనుగొనబడలేదు',
+            noSchemesDesc: 'మెరుగైన ఫలితాల కోసం మీ సమాధానాలు నవీకరించండి.',
+            tryAgain: 'మళ్ళీ ప్రయత్నించండి',
+            noResults: 'ఫలితాలు లేవు',
+            completeFirst: 'దయచేసి ముందు ప్రశ్నాపత్రం పూర్తి చేయండి.',
+            startQuestionnaire: 'ప్రశ్నాపత్రం ప్రారంభించండి',
+            benefit: 'ప్రయోజనం',
+            lastDate: 'చివరి తేదీ',
+            requiredDocs: n => `అవసరమైన పత్రాలు (${n})`,
+            chanceOfBenefit: '🎯 ప్రయోజనం పొందే అవకాశం',
+            eligibility: 'అర్హత',
+            documents: 'పత్రాలు',
+            uploadHint: '⬆️ పత్రాలు అప్‌లోడ్ చేసి ప్రయోజన సంభావ్యత పెంచుకోండి!',
+            uploadBtn: 'పత్రాలు అప్‌లోడ్ చేయండి & ధృవీకరించండి',
+            readAloud: 'జోరుగా చదవండి',
+            fullMatch: '✅ పూర్తి సరిపోలిక',
+            partialMatch: '⚠️ పాక్షిక సరిపోలిక',
+            zeroSchemes: '0 పథకాలు',
+            benefitAudio: (name, desc, amt) => `${name}. ${desc}. ప్రయోజన మొత్తం: ${amt}.`,
+        },
+        ta: {
+            home: 'முகப்பு',
+            title: '🎉 உங்கள் தகுதியான திட்டங்கள்',
+            subtitle: 'உங்கள் பதில்களின் அடிப்படையில், இந்த திட்டங்கள் உங்களுக்கு தகுதியானவை',
+            loading: 'ஏற்றுகிறது...',
+            loadingResults: 'உங்கள் முடிவுகளை ஏற்றுகிறது...',
+            schemesFound: n => `${n} திட்டம்(ங்கள்) கிடைத்தன`,
+            noSchemesTitle: 'திட்டங்கள் கிடைக்கவில்லை',
+            noSchemesDesc: 'சிறந்த முடிவுகளுக்கு உங்கள் பதில்களை புதுப்பிக்கவும்.',
+            tryAgain: 'மீண்டும் முயற்சிக்கவும்',
+            noResults: 'முடிவுகள் இல்லை',
+            completeFirst: 'தயவுசெய்து முதலில் கேள்வித்தாளை பூர்த்தி செய்யுங்கள்.',
+            startQuestionnaire: 'கேள்வித்தாளை தொடங்கவும்',
+            benefit: 'நலன்',
+            lastDate: 'கடைசி தேதி',
+            requiredDocs: n => `தேவையான ஆவணங்கள் (${n})`,
+            chanceOfBenefit: '🎯 நலன் கிடைக்கும் வாய்ப்பு',
+            eligibility: 'தகுதி',
+            documents: 'ஆவணங்கள்',
+            uploadHint: '⬆️ ஆவணங்களை பதிவேற்றி நலன் கிடைக்கும் வாய்ப்பை அதிகரிக்கவும்!',
+            uploadBtn: 'ஆவணங்களை பதிவேற்றவும் & சரிபார்க்கவும்',
+            readAloud: 'சத்தமாக படிக்கவும்',
+            fullMatch: '✅ முழு பொருத்தம்',
+            partialMatch: '⚠️ பகுதி பொருத்தம்',
+            zeroSchemes: '0 திட்டங்கள்',
+            benefitAudio: (name, desc, amt) => `${name}. ${desc}. நலன் தொகை: ${amt}.`,
+        },
+    };
+    const T = R[LANG] || R.en;
+
+    // Translated document labels
+    const docLabels = {
+        en: { aadhaar_card: 'Aadhaar Card', land_record: 'Land Record', bank_passbook: 'Bank Passbook', income_certificate: 'Income Certificate', caste_certificate: 'Caste Certificate', crop_sowing_certificate: 'Crop Sowing Certificate', bpl_card: 'BPL Card', age_proof: 'Age Proof', disability_certificate: 'Disability Certificate', pregnancy_certificate: 'Pregnancy Certificate', education_certificate: 'Education Certificate', business_plan: 'Business Plan', address_proof: 'Address Proof', family_id_card: 'Family ID Card' },
+        hi: { aadhaar_card: 'आधार कार्ड', land_record: 'भूमि रिकॉर्ड', bank_passbook: 'बैंक पासबुक', income_certificate: 'आय प्रमाणपत्र', caste_certificate: 'जाति प्रमाणपत्र', crop_sowing_certificate: 'फसल बुवाई प्रमाणपत्र', bpl_card: 'BPL कार्ड', age_proof: 'आयु प्रमाण', disability_certificate: 'विकलांगता प्रमाणपत्र', pregnancy_certificate: 'गर्भावस्था प्रमाणपत्र', education_certificate: 'शिक्षा प्रमाणपत्र', business_plan: 'व्यापार योजना', address_proof: 'पता प्रमाण', family_id_card: 'परिवार पहचान पत्र' },
+        kn: { aadhaar_card: 'ಆಧಾರ್ ಕಾರ್ಡ್', land_record: 'ಭೂಮಿ ದಾಖಲೆ', bank_passbook: 'ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್', income_certificate: 'ಆದಾಯ ಪ್ರಮಾಣಪತ್ರ', caste_certificate: 'ಜಾತಿ ಪ್ರಮಾಣಪತ್ರ', crop_sowing_certificate: 'ಬೆಳೆ ಬಿತ್ತನೆ ಪ್ರಮಾಣಪತ್ರ', bpl_card: 'BPL ಕಾರ್ಡ್', age_proof: 'ವಯಸ್ಸಿನ ಪ್ರಮಾಣ', disability_certificate: 'ಅಂಗವಿಕಲ ಪ್ರಮಾಣಪತ್ರ', pregnancy_certificate: 'ಗರ್ಭಧಾರಣೆ ಪ್ರಮಾಣಪತ್ರ', education_certificate: 'ಶಿಕ್ಷಣ ಪ್ರಮಾಣಪತ್ರ', business_plan: 'ವ್ಯಾಪಾರ ಯೋಜನೆ', address_proof: 'ವಿಳಾಸ ಪ್ರಮಾಣ', family_id_card: 'ಕುಟುಂಬ ಗುರುತಿನ ಚೀಟಿ' },
+        te: { aadhaar_card: 'ఆధార్ కార్డ్', land_record: 'భూమి రికార్డ్', bank_passbook: 'బ్యాంక్ పాస్‌బుక్', income_certificate: 'ఆదాయ ధృవీకరణ పత్రం', caste_certificate: 'కులధృవీకరణ పత్రం', crop_sowing_certificate: 'పంట విత్తన ధృవీకరణ', bpl_card: 'BPL కార్డ్', age_proof: 'వయసు రుజువు', disability_certificate: 'వికలాంగ ధృవీకరణ', pregnancy_certificate: 'గర్భిణి ధృవీకరణ', education_certificate: 'విద్యా ధృవీకరణ', business_plan: 'వ్యాపార ప్రణాళిక', address_proof: 'చిరునామా రుజువు', family_id_card: 'కుటుంబ గుర్తింపు కార్డు' },
+        ta: { aadhaar_card: 'ஆதார் அட்டை', land_record: 'நில ஆவணம்', bank_passbook: 'வங்கி பாஸ்புக்', income_certificate: 'வருமான சான்றிதழ்', caste_certificate: 'சாதி சான்றிதழ்', crop_sowing_certificate: 'பயிர் விதைப்பு சான்றிதழ்', bpl_card: 'BPL அட்டை', age_proof: 'வயது சான்று', disability_certificate: 'மாற்றுத்திறனாளி சான்றிதழ்', pregnancy_certificate: 'கர்ப்பிணி சான்றிதழ்', education_certificate: 'கல்வி சான்றிதழ்', business_plan: 'வணிக திட்டம்', address_proof: 'முகவரி சான்று', family_id_card: 'குடும்ப அடையாள அட்டை' },
+    };
+    const D = docLabels[LANG] || docLabels.en;
+
+    // Apply static translations
+    document.getElementById('homeLbl').textContent = T.home;
+    document.getElementById('resultsTitle').textContent = T.title;
+    document.getElementById('resultsSubtitle').textContent = T.subtitle;
+    document.getElementById('loadingLbl').textContent = T.loading;
+    document.getElementById('loadingResultsLbl').textContent = T.loadingResults;
+
+    const catIcons = { farmer: '🌾', women: '👩', housing: '🏠', education: '📚', elderly: '👴', disability: '♿', health: '💊', employment: '💼', digital: '💻' };
+    const catClasses = { farmer: 'cat-farmer', women: 'cat-women', housing: 'cat-housing', education: 'cat-education', elderly: 'cat-elderly', disability: 'cat-disability', health: 'cat-health', employment: 'cat-employment', digital: 'cat-digital' };
+
+    function renderSchemes(schemes) {
+        const container = document.getElementById('schemeCards');
+        const countEl = document.getElementById('resultsCount');
+        countEl.innerHTML = `<i class="fas fa-check-circle"></i><span>${T.schemesFound(schemes.length)}</span>`;
+
+        if (!schemes || schemes.length === 0) {
+            container.innerHTML = `<div class="card text-center" style="padding:40px;">
+            <i class="fas fa-search" style="font-size:48px;color:var(--text-muted);margin-bottom:16px;"></i>
+            <h3>${T.noSchemesTitle}</h3>
+            <p style="color:var(--text-secondary);">${T.noSchemesDesc}</p>
+            <a href="/questionnaire/" class="btn btn-primary mt-3"><i class="fas fa-redo"></i> ${T.tryAgain}</a>
+        </div>`;
+            return;
+        }
+
+        container.innerHTML = schemes.map(s => {
+            const catClass = catClasses[s.category] || 'cat-farmer';
+            const catIcon = catIcons[s.category] || '📋';
+            const matchClass = s.is_full_match ? 'match-full' : 'match-partial';
+            const matchLabel = s.is_full_match ? T.fullMatch : T.partialMatch;
+
+            const eligPart = (s.match_score / 100) * 60;
+            const benefitProb = Math.round(eligPart);
+            const probClass = benefitProb >= 70 ? 'prob-high' : benefitProb >= 40 ? 'prob-medium' : 'prob-low';
+
+            const docsList = (s.required_documents || []).map(d =>
+                `<div class="doc-chip"><i class="fas fa-file-alt"></i> ${D[d] || d}</div>`
+            ).join('');
+
+            return `<div class="scheme-card" id="scheme-${s.scheme_id}">
+            <div class="scheme-card-header">
+                <span class="scheme-category ${catClass}">${catIcon} ${s.category}</span>
+                <span class="scheme-match ${matchClass}">${matchLabel} (${s.match_score}%)</span>
+            </div>
+            <div class="scheme-card-body">
+                <div class="scheme-name">${s.name}</div>
+                <div class="scheme-desc">${s.description}</div>
+                <div class="scheme-meta">
+                    <div class="meta-item"><i class="fas fa-rupee-sign"></i> ${T.benefit}: <strong>${s.benefit_amount}</strong></div>
+                    <div class="meta-item"><i class="fas fa-calendar"></i> ${T.lastDate}: <strong>${s.last_date}</strong></div>
+                </div>
+                <div class="docs-section">
+                    <div class="docs-title"><i class="fas fa-file-check"></i> ${T.requiredDocs(s.required_documents ? s.required_documents.length : 0)}</div>
+                    <div class="docs-chips">${docsList}</div>
+                </div>
+                <div class="probability-section">
+                    <div class="prob-label">
+                        <span>${T.chanceOfBenefit}</span>
+                        <span class="prob-value" id="prob-${s.scheme_id}" style="font-weight:700;color:var(--text-primary);">${benefitProb}%</span>
+                    </div>
+                    <div class="prob-bar"><div class="prob-fill ${probClass}" id="probbar-${s.scheme_id}" style="width:${benefitProb}%"></div></div>
+                    <div class="prob-formula">
+                        <span><i class="fas fa-check-circle"></i> ${T.eligibility}: ${s.match_score}% × 60%</span>
+                        <span><i class="fas fa-file-upload"></i> ${T.documents}: 0% × 40%</span>
+                    </div>
+                    <p class="prob-hint">${T.uploadHint}</p>
+                </div>
+            </div>
+            <div class="scheme-card-footer">
+                <a href="/documents/${s.scheme_id}/" class="btn btn-primary" style="padding:10px 24px;font-size:14px;">
+                    <i class="fas fa-upload"></i> ${T.uploadBtn}
+                </a>
+                <button class="btn btn-outline" style="padding:10px 20px;font-size:14px;" onclick="speakScheme('${s.scheme_id}')">
+                    <i class="fas fa-volume-up"></i> ${T.readAloud}
+                </button>
+            </div>
+        </div>`;
+        }).join('');
+    }
+
+    function speakScheme(schemeId) {
+        const scheme = sessionSchemes.find(s => s.scheme_id === schemeId);
+        if (scheme) speakText(T.benefitAudio(scheme.name, scheme.description, scheme.benefit_amount), LANG);
+    }
+
+    if (sessionSchemes && sessionSchemes.length > 0) {
+        renderSchemes(sessionSchemes);
+    } else {
+        document.getElementById('schemeCards').innerHTML = `
+    <div class="card text-center" style="padding:40px;">
+        <i class="fas fa-exclamation-triangle" style="font-size:48px;color:var(--secondary);margin-bottom:16px;"></i>
+        <h3>${T.noResults}</h3>
+        <p class="mt-1" style="color:var(--text-secondary);">${T.completeFirst}</p>
+        <a href="/questionnaire/" class="btn btn-primary mt-3"><i class="fas fa-redo"></i> ${T.startQuestionnaire}</a>
+    </div>`;
+        document.getElementById('resultsCount').innerHTML = `<i class="fas fa-exclamation-circle"></i><span>${T.zeroSchemes}</span>`;
+    }
+</script>
+{% endblock %}
